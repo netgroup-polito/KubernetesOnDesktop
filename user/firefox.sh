@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #Start the docker in background
-docker run dunno &
+docker run firefox-vnc &
 
 #Wait for docker to start up
 sleep 2
