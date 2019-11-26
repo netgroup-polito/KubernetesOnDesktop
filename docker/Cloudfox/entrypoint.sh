@@ -1,10 +1,10 @@
 #!/bin/bash
 
 # Start Xvfb
-Xvfb :99 -ac -screen 0 1024x768x24 -nolisten tcp &
+Xvfb :0 -ac -screen 0 1920x1200x24 -nolisten tcp &
 
 #Export display env variable
-export DISPLAY=:99
+export DISPLAY=:0
 
 #Start firefox in background
 firefox --no-sandbox &
