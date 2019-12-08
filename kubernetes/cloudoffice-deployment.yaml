@@ -13,12 +13,20 @@ spec:
       labels:
         app: cloudoffice
     spec:
+      volumes:
+      - name: cloudoffice-volume
+        hostPath:
+          path: /home/s41m0n/Desktop/attempt
       containers:
       - name: libreoffice-kubernetes
         image: s41m0n/libreoffice-kubernetes:latest
         imagePullPolicy: Always
         ports:
         - containerPort: 5900
+        volumeMounts:
+        - mountPath: "/usr/attempt"
+          name: cloudoffice-volume
+      terminationGracePeriodSeconds: 0
 ---
 apiVersion: v1
 kind: Service
