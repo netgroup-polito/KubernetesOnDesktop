@@ -1,0 +1,37 @@
+### POD config
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: firefox-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: firefox
+  template:
+    metadata:
+      labels:
+        app: firefox
+    spec:
+      containers:
+      - name: firefox-kubernetes
+        image: s41m0n/firefox-kubernetes-ssh:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 22
+      terminationGracePeriodSeconds: 0
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: firefox-service
+spec:
+  selector:
+    app: firefox
+  ports:
+  - name: vnc-port-tcp
+    protocol: TCP
+    port: 22
+    targetPort: 22
+    nodePort: 31501
+  type: NodePort
