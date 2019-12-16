@@ -30,11 +30,11 @@ spec:
         - name: "VNC_PASSWORD"
           value: "default"
         - name: "DISPLAY_WIDTH"
-          value: "1280"
+          value: "1920"
         - name: "DISPLAY_HEIGHT"
-          value: "760"
-#        - name: "SECURE_CONNECTION"
-#          value: "1"
+          value: "1080"
+        - name: "SECURE_CONNECTION"
+          value: "1"
         ports:
         - containerPort: 5800
         - containerPort: 5900

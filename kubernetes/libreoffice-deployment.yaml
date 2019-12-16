@@ -20,7 +20,7 @@ spec:
       containers:
       - name: libreoffice-kubernetes
         image: s41m0n/libreoffice
-        imagePullPolicy: IfNotPresent
+        imagePullPolicy: Always
         env:
         - name: "VNC_PASSWORD"
           value: "default"
@@ -50,11 +50,11 @@ spec:
     app: libreoffice
   ports:
   # This port is to allow "VNC" over HTTP
-  #- name: http-port-tcp
-  #  protocol: TCP
-  #  port: 5800
-  #  targetPort: 5800
-  #  nodePort: 31503
+  - name: http-port-tcp
+    protocol: TCP
+    port: 5800
+    targetPort: 5800
+    nodePort: 31503
   - name: vnc-port-tcp
     protocol: TCP
     port: 5900

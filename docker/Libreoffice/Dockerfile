@@ -1,6 +1,7 @@
 # Pull base image.
 FROM jlesage/baseimage-gui:alpine-3.6
 
+#Install libreoffice
 RUN add-pkg libreoffice
 
 # Copy the start script.
