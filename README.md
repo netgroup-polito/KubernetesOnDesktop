@@ -69,8 +69,26 @@ To use it, type in a terminal:
 user@hostname:~/WorkingDirectory$ ./run_cloud.sh firefox
 ```
 
-The script accept also a secondary integer argument to specify the time to wait for the pod to be created
-Depending on the Desktop configuration in the `.yaml` deployment files, the vnc window will be assigned that dimensions. And that's the result.
+Actually there are a lot of optional parameter as reported in the script usage:
+
+```bash
+Run application in Cloud using Kubernetes as orchestrator.
+Usage: ./run_cloud.sh [-h] [-i] [-e] [-d screen_resolution] [-t timeout] <application_name>
+|-> -h: start the helper menu
+|-> -i: start the script in interactive mode
+|-> -e: specify that the connection must be encrypted
+|-> -d: specify the resolution to be used (ex. 1920x1080)
+|-> -t: connection/wait timeout in seconds (ex. 10)
+|
+|->Example: ./run_cloud.sh firefox
+|->Example: ./run_cloud.sh -d 1920x1080 -t 10 -e firefox
+```
+
+If not specified, the default ones are the following:
+	
+* No encryption is used
+* Timeout = 60 seconds
+* Screen resolution = your actual screen one
 
 Firefox over Vnc
 
