@@ -2,20 +2,20 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: libreoffice-deployment
+  name: firefox-deployment
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: libreoffice
+      app: firefox
   template:
     metadata:
       labels:
-        app: libreoffice
+        app: firefox
     spec:
       containers:
-      - name: libreoffice-kubernetes
-        image: s41m0n/libreoffice-kubernetes-ssh:latest
+      - name: firefox-kubernetes
+        image: s41m0n/firefox-kubernetes:enc
         imagePullPolicy: Always
         ports:
         - containerPort: 22
@@ -24,14 +24,14 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: libreoffice-service
+  name: firefox-service
 spec:
   selector:
-    app: libreoffice
+    app: firefox
   ports:
   - name: vnc-port-tcp
     protocol: TCP
     port: 22
     targetPort: 22
-    nodePort: 31502
+    nodePort: 31501
   type: NodePort
