@@ -9,6 +9,7 @@ enc=0
 #Variables to decide the screen size
 width=1280
 height=760
+supported_apps=("firefox" "libreoffice")
 
 function adjust_screen {
 	wline=`grep -n 'DISPLAY_WIDTH' ${targetDeploy} | cut -d : -f -1`
@@ -112,10 +113,16 @@ function clear_and_exit {
 
 #Print usage function
 function print_usage_and_exit {
-	echo "Run cloud application specifying the typology and an optional attempt to connect timeout parameter."
-	echo "Usage: ./run_cloud.sh <application_name> [<timeout>]"
+	echo "Run application in Cloud using Kubernetes as orchestrator."
+	echo "Usage: ./run_cloud.sh [-h] [-i] [-e] [-d screen_resolution] [-t timeout] <application_name>"
+	echo "|-> -h: start the helper menu"
+	echo "|-> -i: start the script in interactive mode"
+	echo "|-> -e: specify that the connection must be encrypted"
+	echo "|-> -d: specify the resolution to be used (ex. 1920x1080)"
+	echo "|-> -t: connection/wait timeout in seconds (ex. 10)"
+	echo "|"
 	echo "|->Example: ./run_cloud.sh firefox"
-	echo "|->Example: ./run_cloud.sh firefox 2"
+	echo "|->Example: ./run_cloud.sh -d 1920x1080 -t 10 -e firefox"
 	exit $1
 }
 
@@ -136,8 +143,14 @@ function start_interactive {
 }
 
 function main() {
-	#Checking input application argument, maybe in the future it has to be
-	#checked the application within a list of supported
+	#Retrieving the name of the application passed as last argument
+	for application_name in $@; do :; done
+	#The target deployment file
+	targetDeploy="kubernetes/${application_name}-deployment.yaml"
+	
+	if [ $# -lt 1 ] || ! ( IFS=$'\n'; echo "${supported_apps[*]}" ) | grep -qFx "$application_name" &>/dev/null; then
+		print_usage_and_exit 1
+	fi
 
 	retrieve_screen_dim &>/dev/null
 
@@ -168,7 +181,7 @@ function main() {
 				print_usage_and_exit 0
 				;;
 			i)
-				echo "Starting interactive...!"
+				echo "Starting interactive..."
 				start_interactive
 				;;
 	    \?)
@@ -176,12 +189,6 @@ function main() {
 	      ;;
 	  esac
 	done
-
-	#Retrieving the name of the application passed as last argument
-	for application_name in $@; do :; done
-	
-	#The target deployment file
-	targetDeploy="kubernetes/${application_name}-deployment.yaml"
 
 	start_deploy
 	exit 0

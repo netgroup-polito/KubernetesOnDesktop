@@ -66,7 +66,7 @@ The user must use the `run_cloud.sh` script to launch application. It is strongl
 To use it, type in a terminal:
 
 ```bash
-user@hostname  WorkingDirectory   ./run_cloud.sh firefox
+user@hostname:~/WorkingDirectory$ ./run_cloud.sh firefox
 ```
 
 The script accept also a secondary integer argument to specify the time to wait for the pod to be created
