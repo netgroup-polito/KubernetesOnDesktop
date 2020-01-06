@@ -1,3 +1,4 @@
+#User home directory volume
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -6,6 +7,7 @@ spec:
   storageClassName: rook-ceph-block
   accessModes:
   - ReadWriteOnce
+  #Setting a default storage size
   resources:
     requests:
       storage: 3Gi

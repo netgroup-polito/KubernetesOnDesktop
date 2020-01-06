@@ -3,5 +3,4 @@
 This directory contains all the yaml file used to deploy the various applications. In particular:
 
 * `volume.yaml`: the config to mount a Persistent Volume Claim corresponding to the user directory 
-* `firefox-kubernetes.yaml`: the Firefox deployment
-* `libreoffice-kubernetes.yaml`: the Libreoffice deployment
+* `deployment.yaml`: the generic deployment for each supported application (just modify `XXXXXXXXXX` with the desired application name)
