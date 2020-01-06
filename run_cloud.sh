@@ -4,11 +4,14 @@
 timeout=60
 #The Persistent Volume Claim deployment
 pvcDeploy="kubernetes/volume.yaml"
+#The target deployment file
+targetDeploy="kubernetes/deployment.yaml"
 #Variable to select connection type, 0=clear, 1=encrypted
 enc=0
 #Variables to decide the screen size
 width=1280
 height=760
+#List of supported apps
 supported_apps=("firefox" "libreoffice")
 
 function adjust_screen {
@@ -24,11 +27,25 @@ function adjust_screen {
 function adjust_encription {
 	#If the user requires encryption, uncomment deployment parameter
 	#otherwise comment it if it is not already commented
-  if [ ${enc} -eq 1 ]; then
-  	sed -e '/SECURE_CONNECTION/,+1 s/^#*//' -i ${targetDeploy}
-  else
-  	sed -e '/SECURE_CONNECTION/,+1 s/^#*/#/' -i ${targetDeploy}
-  fi
+	line=`grep -n 'SECURE_CONNECTION' ${targetDeploy} | cut -d : -f -1`
+	((line=line+1))
+
+	sed -i "${line}s/[0-1]/${enc}/" ${targetDeploy}	
+}
+
+function adjust_deploy {
+	if [ $1 -eq 1 ]; then
+		sed -i "s/${application_name}/XXXXXXXXXX/" ${targetDeploy}
+	else
+		sed -i "s/XXXXXXXXXX/${application_name}/" ${targetDeploy}
+	fi
+}
+
+function adjust_token {
+	line=`grep -n 'VNC_PASSWORD' ${targetDeploy} | cut -d : -f -1`
+	((line=line+1))
+	
+	sed -i "${line}s/\".*\"/\"$1\"/" ${targetDeploy}
 }
 
 #Main function to start the deployment of the desider application
@@ -37,69 +54,81 @@ function start_deploy {
 	adjust_screen
 
 	adjust_encription
-	
-  #Using a default cluster IP before knowing the real one.
-  #We can assume that the network speed isn't different at all.
-  echo -n "Measuring network speed..."
-  netspeed=`iperf -c 130.192.225.70 -u -i 1 -t 1 2>/dev/null| grep -Po '[0-9.]*(?= Mbits/sec)'`
-	echo "OK ${netspeed} Mbit/s"
 
-	#Checking network speed availability
-	if [[ $(echo "${netspeed}>0.5" | bc) -eq 1 ]]; then
+	adjust_deploy 0
+	
+  #Checking connectivity
+  echo -n "Checking connectivity..."
+  nettime=$( TIMEFORMAT="%3U + %3S"; { time timeout 2 kubectl describe pods; } 2>&1)
+
+  if [ $? -eq 0 ]; then
+  	#Parsing previous output to get sum of seconds
+  	nettime=$(echo ${nettime} | sed 's/,/./g' |  awk '{printf "%f", $1 + $2}')
 		
-		echo -n "Applying deploy..."
-		#Start both deploy and volume
-  	kubectl apply -f $pvcDeploy &>/dev/null && kubectl apply -f $targetDeploy &>/dev/null
-	
-		if [ $? -ge 0 ]; then
+		#Checking network speed availability
+		if [[ $(echo "${nettime}<0.5" | bc) -eq 1 ]]; then
+			
+			echo "OK cluster answered in ${nettime} seconds"
+			
+			echo -n "Generating toker..."
+			token=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
 			echo "OK"
-			#Register Ctr+C interrupt
-			trap clear_and_exit INT
 
-			#Waiting for the pod to start
-			echo -n "Waiting for pod to start, max ${timeout}seconds..."
-			kubectl wait --for=condition=Ready pod -l "app=${application_name}" --timeout=${timeout}s &>/dev/null
+			adjust_token ${token}
 
-			if [ $? -eq 0 ]; then
+			echo -n "Applying deploy..."
+			#Start both deploy and volume
+  		kubectl apply -f $pvcDeploy &>/dev/null && kubectl apply -f $targetDeploy &>/dev/null
+		
+			if [ $? -ge 0 ]; then
 				echo "OK"
-				
-				echo -n "Retrieving node IP and PORT..."
-				#Retrieving the ip/port of the node
-				targetNodeIp=`kubectl get pod -l app=${application_name} -o "jsonpath={..status.hostIP}"`
-				targetNodePort=`kubectl get svc ${application_name}-service -o "jsonpath={.spec.ports[?(@.name=='vnc-port-tcp')].nodePort}"`
-				echo "OK ${targetNodeIp}:${targetNodePort}"
-				
-				echo -n "Waiting for the NodePort to be opened..."
-				while ! nc -z ${targetNodeIp} ${targetNodePort}; do   
-					echo -n "."
-  				sleep 1 
-				done
-				echo "OK"
-				
-				#Check encryption, if yes -> start vnc encrypted connection
-				#otherwise -> start normal vnc connection
-				if [ $enc -eq 1 ]; then
-					echo "Starting encrypted connection..."
-					ssvnc $targetNodeIp:$targetNodePort -nvb -killstunnel 2>/dev/null
+				#Register Ctr+C interrupt
+				trap clear_and_exit INT
+	
+				#Waiting for the pod to start
+				echo -n "Waiting for pod to start, max ${timeout}seconds..."
+				kubectl wait --for=condition=Ready pod -l "app=${application_name}" --timeout=${timeout}s &>/dev/null
+	
+				if [ $? -eq 0 ]; then
+					echo "OK pod running"
+					
+					echo -n "Retrieving node IP and PORT..."
+					#Retrieving the ip/port of the node
+					targetNodeIp=`kubectl get pod -l app=${application_name} -o "jsonpath={..status.hostIP}"`
+					targetNodePort=`kubectl get svc ${application_name}-service -o "jsonpath={.spec.ports[?(@.name=='vnc-port-tcp')].nodePort}"`
+					echo "OK ${targetNodeIp}:${targetNodePort}"
+					
+					echo -n "Waiting for the NodePort to be opened..."
+					while ! nc -z ${targetNodeIp} ${targetNodePort}; do   
+						echo -n "."
+  					sleep 1 
+					done
+					echo "OK port opened"
+					
+					#Check encryption, if yes -> start vnc encrypted connection
+					#otherwise -> start normal vnc connection
+					if [ $enc -eq 1 ]; then
+						echo "Starting encrypted connection..."
+						ssvnc -cmd $targetNodeIp:$targetNodePort -passwd <(echo ${token} | vncpasswd -f) > /dev/null 2>&1
+					else
+						echo -n "Starting clear connection..."
+						vncviewer $targetNodeIp::$targetNodePort -passwd <(echo ${token} | vncpasswd -f) 2>/dev/null
+					fi
+					echo "OK"
+					clear_and_exit 0
 				else
-					echo "Starting clear connection..."
-					vncviewer $targetNodeIp::$targetNodePort -passwd <(echo "default" | vncpasswd -f) 2>/dev/null
+					echo "ERROR cannot create pod, running ${application_name} locally"
 				fi
-				echo "OK"
-				clear_and_exit 0
 			else
-				echo "ERROR"
-		 	 	echo "Cannot create pod, running ${application_name} locally"
+				echo "ERROR cannot apply deployment, running ${application_name} locally"
 			fi
 		else
-			echo "ERROR"
-			echo "Cannot apply deployment, running ${application_name} locally"
+			echo "ERROR cluster answered in ${nettime} seconds (too slow), running ${application_name} locally"
 		fi
 	else
-		echo "Your internet connection is too slow, running ${application_name} locally"
-	fi
+		echo "ERROR no internet, running ${application_name} locally"
+  fi
 	${application_name} &>/dev/null &
-	clear_and_exit 0
 }
 
 #Delete only the deployment NOT the pvc
@@ -108,6 +137,7 @@ function clear_and_exit {
 	echo -n "Deleting deploy..."
 	kubectl delete -f $targetDeploy &>/dev/null
 	echo "OK"
+	adjust_deploy 1
 	exit $1
 }
 
@@ -145,8 +175,6 @@ function start_interactive {
 function main() {
 	#Retrieving the name of the application passed as last argument
 	for application_name in $@; do :; done
-	#The target deployment file
-	targetDeploy="kubernetes/${application_name}-deployment.yaml"
 	
 	if [ $# -lt 1 ] || ! ( IFS=$'\n'; echo "${supported_apps[*]}" ) | grep -qFx "$application_name" &>/dev/null; then
 		print_usage_and_exit 1
@@ -191,7 +219,7 @@ function main() {
 	done
 
 	start_deploy
-	exit 0
+	clear_and_exit 0
 }
 
 main $@
