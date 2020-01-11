@@ -50,6 +50,7 @@ Remmina in that scenario would be a perfect and efficient client to connect to t
 <https://wiki.archlinux.org/index.php/Xrdp>
 <https://github.com/neutrinolabs/pulseaudio-module-xrdp/wiki/README>
 <https://www.reddit.com/r/sysadmin/comments/8j68pv/linux_based_rdp_server/>
+https://hub.docker.com/r/danielguerra/firefox-rdp/dockerfile
 
 ### Tiger/Tight/X11-VNC (+ PulseAudio server)
 
