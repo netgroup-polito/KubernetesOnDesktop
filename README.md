@@ -75,10 +75,11 @@ Actually there are a lot of optional parameter as reported in the script usage:
 Run application in Cloud using Kubernetes as orchestrator.
 Usage: ./run_cloud.sh [-h] [-i] [-e] [-d screen_resolution] [-t timeout] <application_name>
 |-> -h: start the helper menu
-|-> -i: start the script in interactive mode
-|-> -e: specify that the connection must be encrypted
-|-> -d: specify the resolution to be used (ex. 1920x1080)
-|-> -t: connection/wait timeout in seconds (ex. 10)
+|-> -i: start the script in interactive mode (default non-interactive)
+|-> -e: specify that the connection must be encrypted (default 0)
+|-> -d: specify the resolution to be used (default actual screen dimensions)
+|-> -t: connection/wait timeout in seconds (default 60s)
+|-> -p: connection protocol to be used (default vnc, supports also xrdp and novnc)
 |
 |->Example: ./run_cloud.sh firefox
 |->Example: ./run_cloud.sh -d 1920x1080 -t 10 -e firefox
@@ -89,6 +90,8 @@ If not specified, the default ones are the following:
 * No encryption is used
 * Timeout = 60 seconds
 * Screen resolution = your actual screen one
+* Protocol = VNC
+* Non-interactive mode
 
 Firefox over Vnc
 
