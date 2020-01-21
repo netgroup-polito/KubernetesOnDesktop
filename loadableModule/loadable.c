@@ -66,6 +66,7 @@ asmlinkage int custom_execve(const char __user *filename, const char __user *con
 	return real_execve(filename, argv, envp);
 }
 
+/*Function to make the syscall table Read+Write*/
 int make_rw(unsigned long address) 
 {
 	unsigned int level;
@@ -75,7 +76,7 @@ int make_rw(unsigned long address)
 	return 0;
 }
 
-
+/*Function to make syscall table Read only (the default value)*/
 int make_ro(unsigned long address)
 {
 	unsigned int level;
@@ -84,6 +85,7 @@ int make_ro(unsigned long address)
 	return 0;
 }
 
+/*The init function of the module will modify the real execve with mine*/
 static int __init myInit(void)
 {
 	/* hook execve system call*/
@@ -98,6 +100,7 @@ static int __init myInit(void)
 	return 0;
 }
 
+/*The exit function will reset the execve function to the real one previously saved*/
 static void __exit myExit(void)
 {
 	/* resume what it should be */

@@ -98,7 +98,19 @@ Firefox over Http
 
 ![Firefox over Http](res/Firefox2.png)
 
-## Example
+## Known issues/lacks
+
+Due to the amount of time spent digging all the different technologies, the VNC version all the docker images doesn't support the audio streaming yet. In spite performing audio redirection using PulseAudio seems to be a very efficient and easy solution, installing all the needed packages from scratch on a docker is trickier than I thought. It requires analysis and PulseAudio knowledge.
+
+## Audio streaming version
+
+To allow audio streaming and expose this demo, I used RDP (Remote Desktop Connection), a protocol developed by Microsoft which allows not only to see the remote desktop as VNC does, but it also redirect the audio, accomplishing our objective. In fact, an RDP connections allows you to decide whether the audio should be played locally (on the client computer via redirection) or remotely (on the server, using its audio device! In order to hear that you should physically be in the same place).
+
+This demo shows the Firefox use case.
+
+```bash
+
+```
 
 ## Acknowledgments
 

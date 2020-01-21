@@ -1,7 +1,11 @@
 #!/bin/bash
 
+#Protocol to be used (default VNC)
+protocol="vnc"
 #Timeout to wait for the pod creation (expressed in seconds)
 timeout=60
+#Seconds for the server response to consider a good connection
+connection_answer_time=1
 #The Persistent Volume Claim deployment
 pvcDeploy="kubernetes/volume.yaml"
 #The target deployment file
@@ -11,9 +15,13 @@ enc=0
 #Variables to decide the screen size
 width=1280
 height=760
+#Variable which tracks if the deployment has successfully been launched
+deployed=0
 #List of supported apps
 supported_apps=("firefox" "libreoffice")
+supported_protocols=("vnc" "novnc" "xrdp")
 
+#Set screen dimensions
 function adjust_screen {
 	wline=`grep -n 'DISPLAY_WIDTH' ${targetDeploy} | cut -d : -f -1`
 	hline=`grep -n 'DISPLAY_HEIGHT' ${targetDeploy} | cut -d : -f -1`
@@ -24,23 +32,20 @@ function adjust_screen {
 	sed -i "${hline}s/[0-9]\+/${height}/" ${targetDeploy}
 }
 
+#Set SECURE_CONNECTION to 1/0 depending on encryption
 function adjust_encription {
-	#If the user requires encryption, uncomment deployment parameter
-	#otherwise comment it if it is not already commented
 	line=`grep -n 'SECURE_CONNECTION' ${targetDeploy} | cut -d : -f -1`
 	((line=line+1))
 
 	sed -i "${line}s/[0-1]/${enc}/" ${targetDeploy}	
 }
 
-function adjust_deploy {
-	if [ $1 -eq 1 ]; then
-		sed -i "s/${application_name}/XXXXXXXXXX/" ${targetDeploy}
-	else
-		sed -i "s/XXXXXXXXXX/${application_name}/" ${targetDeploy}
-	fi
+#Set application name in deployment
+function adjust_appname {
+	sed -i "s/XXXXXXXXXX/${application_name}/" ${targetDeploy}
 }
 
+#Set the new generated token
 function adjust_token {
 	line=`grep -n 'VNC_PASSWORD' ${targetDeploy} | cut -d : -f -1`
 	((line=line+1))
@@ -48,16 +53,90 @@ function adjust_token {
 	sed -i "${line}s/\".*\"/\"$1\"/" ${targetDeploy}
 }
 
-#Main function to start the deployment of the desider application
+#Comment/Uncomment services and ports depending on protocol used
+function adjust_protocol {
+	from_novnc_service=`grep -w -n 'novnc-svc-port' ${targetDeploy} | cut -d : -f -1`
+	((till_novnc_service=from_novnc_service+3))
+	from_vnc_service=`grep -w -n 'vnc-svc-port' ${targetDeploy} | cut -d : -f -1`
+	((till_vnc_service=from_vnc_service+3))
+	from_xrdp_service=`grep -w -n 'xrdp-svc-port' ${targetDeploy} | cut -d : -f -1`
+	((till_xrdp_service=from_xrdp_service+3))
+	from_novnc_container=`grep -w -n 'novnc-cont-port' ${targetDeploy} | cut -d : -f -1`
+	((till_novnc_container=from_novnc_container+1))
+	from_vnc_container=`grep -w -n 'vnc-cont-port' ${targetDeploy} | cut -d : -f -1`
+	((till_vnc_container=from_vnc_container+1))
+	from_xrdp_container=`grep -w -n 'xrdp-cont-port' ${targetDeploy} | cut -d : -f -1`
+	((till_xrdp_container=from_xrdp_container+1))
+
+	if [ "$protocol" = "vnc" ]; then
+		sed -i "${from_xrdp_service},${till_xrdp_service} {s/^/#/}" ${targetDeploy}
+		sed -i "${from_xrdp_container},${till_xrdp_container} {s/^/#/}" ${targetDeploy}
+		sed -i "${from_novnc_service},${till_novnc_service} {s/^/#/}" ${targetDeploy}
+		sed -i "${from_novnc_container},${till_novnc_container} {s/^/#/}" ${targetDeploy}
+	elif [ "$protocol" = "novnc" ]; then
+		sed -i "${from_xrdp_service},${till_xrdp_service} {s/^/#/}" ${targetDeploy}
+		sed -i "${from_xrdp_container},${till_xrdp_container} {s/^/#/}" ${targetDeploy}
+		sed -i "${from_vnc_service},${till_vnc_service} {s/^/#/}" ${targetDeploy}
+		sed -i "${from_vnc_container},${till_vnc_container} {s/^/#/}" ${targetDeploy}
+	else
+		sed -i "${from_novnc_service},${till_novnc_service} {s/^/#/}" ${targetDeploy}
+		sed -i "${from_novnc_container},${till_novnc_container} {s/^/#/}" ${targetDeploy}
+		sed -i "${from_vnc_service},${till_vnc_service} {s/^/#/}" ${targetDeploy}
+		sed -i "${from_vnc_container},${till_vnc_container} {s/^/#/}" ${targetDeploy}
+	fi
+}
+
+function connect {
+	if [ "$protocol" = "vnc" ]; then
+		#Check encryption, if yes -> start vnc encrypted connection
+		#otherwise -> start normal vnc connection
+		if [ $enc -eq 1 ]; then
+			echo "Starting encrypted VNC connection..."
+			ssvnc -cmd $targetNodeIp:$targetNodePort -passwd <(echo ${token} | vncpasswd -f) > /dev/null 2>&1
+		else
+			echo -n "Starting clear VNC connection..."
+			vncviewer $targetNodeIp::$targetNodePort -passwd <(echo ${token} | vncpasswd -f) 2>/dev/null
+		fi
+	elif [ "$protocol" = "novnc" ]; then
+		if [ $enc -eq 1 ]; then
+			echo -n "Starting encrypted NOVnc connection..."
+			url="https://$targetNodeIp:$targetNodePort"
+		else
+			echo -n "Starting clear NOVnc connection..."
+			url="http://$targetNodeIp:$targetNodePort"
+		fi
+		notify-send -t $timeout -a 'Kubernetes on Desktop' "One time Token" "$token"
+		firefox $url &>/dev/null
+		pid=`pgrep firefox`
+		((timeout=timeout*timeout))
+		timeout $timeout tail --pid=$pid -f /dev/null &>/dev/null
+	else
+		echo -n "Starting encrypted XRDP connection..."
+		rdesktop -r sound:local $targetNodeIp:$targetNodePort 2>/dev/null
+	fi
+	echo "OK"
+}
+
+#Retrieving the IP/port of the node
+function retrieve_pod_info {
+	targetNodeIp=`kubectl get pod -l app=${application_name} -o "jsonpath={..status.hostIP}"`
+	targetNodePort=`kubectl get svc ${application_name}-service -o 'jsonpath={.spec.ports[?(@.name=="'${protocol}'-svc-port")].nodePort}'`
+}
+
+#Main function to start the deployment of the desired application
 function start_deploy {
+	#For safety let's copy the deployment and modify the temporary one
+	tmp_name="$(date +%F_%T).yaml"
+	cp ${targetDeploy} ./${tmp_name}
+	targetDeploy="$tmp_name"
+
+	#Register Ctr+C interrupt
+	trap clear_and_exit INT TERM
 	
-	adjust_screen
-
-	adjust_encription
-
-	adjust_deploy 0
+	adjust_screen && adjust_encription && adjust_appname && adjust_protocol
 	
   #Checking connectivity
+  #To perform that task, the command `kubectl describe pods` is used (we could use version, but too fast since tight)
   echo -n "Checking connectivity..."
   nettime=$( TIMEFORMAT="%3U + %3S"; { time timeout 2 kubectl describe pods; } 2>&1)
 
@@ -66,7 +145,7 @@ function start_deploy {
   	nettime=$(echo ${nettime} | sed 's/,/./g' |  awk '{printf "%f", $1 + $2}')
 		
 		#Checking network speed availability
-		if [[ $(echo "${nettime}<0.5" | bc) -eq 1 ]]; then
+		if [[ $(echo "${nettime}<${connection_answer_time}" | bc) -eq 1 ]]; then
 			
 			echo "OK cluster answered in ${nettime} seconds"
 			
@@ -82,9 +161,8 @@ function start_deploy {
 		
 			if [ $? -ge 0 ]; then
 				echo "OK"
-				#Register Ctr+C interrupt
-				trap clear_and_exit INT
-	
+				deployed=1
+				
 				#Waiting for the pod to start
 				echo -n "Waiting for pod to start, max ${timeout}seconds..."
 				kubectl wait --for=condition=Ready pod -l "app=${application_name}" --timeout=${timeout}s &>/dev/null
@@ -93,29 +171,20 @@ function start_deploy {
 					echo "OK pod running"
 					
 					echo -n "Retrieving node IP and PORT..."
-					#Retrieving the ip/port of the node
-					targetNodeIp=`kubectl get pod -l app=${application_name} -o "jsonpath={..status.hostIP}"`
-					targetNodePort=`kubectl get svc ${application_name}-service -o "jsonpath={.spec.ports[?(@.name=='vnc-port-tcp')].nodePort}"`
+					retrieve_pod_info
 					echo "OK ${targetNodeIp}:${targetNodePort}"
 					
 					echo -n "Waiting for the NodePort to be opened..."
-					while ! nc -z ${targetNodeIp} ${targetNodePort}; do   
-						echo -n "."
-  					sleep 1 
-					done
-					echo "OK port opened"
-					
-					#Check encryption, if yes -> start vnc encrypted connection
-					#otherwise -> start normal vnc connection
-					if [ $enc -eq 1 ]; then
-						echo "Starting encrypted connection..."
-						ssvnc -cmd $targetNodeIp:$targetNodePort -passwd <(echo ${token} | vncpasswd -f) > /dev/null 2>&1
+					timeout $timeout bash -c "while ! nc -z $targetNodeIp $targetNodePort; do sleep 1;done"
+
+					if [ $? -eq 0 ]; then
+						echo "OK port opened"
+						connect
+						return
+
 					else
-						echo -n "Starting clear connection..."
-						vncviewer $targetNodeIp::$targetNodePort -passwd <(echo ${token} | vncpasswd -f) 2>/dev/null
+						echo "ERROR Nodeport took too much to be opened, running ${application_name} locally"
 					fi
-					echo "OK"
-					clear_and_exit 0
 				else
 					echo "ERROR cannot create pod, running ${application_name} locally"
 				fi
@@ -126,18 +195,22 @@ function start_deploy {
 			echo "ERROR cluster answered in ${nettime} seconds (too slow), running ${application_name} locally"
 		fi
 	else
-		echo "ERROR no internet, running ${application_name} locally"
+		echo "ERROR no Internet, running ${application_name} locally"
   fi
 	${application_name} &>/dev/null &
 }
 
-#Delete only the deployment NOT the pvc
+#Delete only the deployment NOT the volume
 function clear_and_exit {
 	echo
-	echo -n "Deleting deploy..."
-	kubectl delete -f $targetDeploy &>/dev/null
+	if [ $deployed -eq 1 ]; then
+		echo -n "Deleting deploy on cluster..."
+		kubectl delete -f $targetDeploy &>/dev/null
+		echo "OK"
+	fi
+	echo -n "Deleting deploy file..."
+	rm -f $targetDeploy
 	echo "OK"
-	adjust_deploy 1
 	exit $1
 }
 
@@ -156,12 +229,14 @@ function print_usage_and_exit {
 	exit $1
 }
 
+#Retrieve user screen dimensions
 function retrieve_screen_dim {
 	echo -n "Reading screen dimensions...OK "
-	read -r width height <<<$(xdpyinfo | grep dimensions | sed -r 's/^[^0-9]*([0-9]+x[0-9]+).*$/\1/' | sed 's/x/ /g')
+	read -r width height <<<$(xdpyinfo | grep -w -m 1 "dimensions" | sed -r 's/^[^0-9]*([0-9]+x[0-9]+).*$/\1/' | sed 's/x/ /g')
 	echo "${width}x${height}"
 }
 
+#Function to retrieve each parameter interactively (STILL NOT COMPLETED
 function start_interactive {
 	echo "Do you wish to encrypt connection?"
 	select yn in "Yes" "No"; do
@@ -175,14 +250,14 @@ function start_interactive {
 function main() {
 	#Retrieving the name of the application passed as last argument
 	for application_name in $@; do :; done
-	
+	asd=1
 	if [ $# -lt 1 ] || ! ( IFS=$'\n'; echo "${supported_apps[*]}" ) | grep -qFx "$application_name" &>/dev/null; then
 		print_usage_and_exit 1
 	fi
 
 	retrieve_screen_dim &>/dev/null
 
-	while getopts "ihd:et:" opt; do
+	while getopts "ihd:etp:" opt; do
   	case $opt in
 	    d)
 				echo "$OPTARG" | grep -P -q '\d+x\d+'
@@ -207,6 +282,17 @@ function main() {
 	      ;;
 	    h)
 				print_usage_and_exit 0
+				;;
+			p)
+				if ! ( IFS=$'\n'; echo "${supported_protocols[*]}" ) | grep -qFx "$OPTARG" &>/dev/null; then
+					echo "Protocol not supported"
+					exit 1
+				fi
+				protocol="$OPTARG"
+				echo "Parameter PROTOCOL $OPTARG...OK"
+				if [ "$OPTARG" = "xrdp" ] && [ "$application_name" = "firefox" ]; then
+					application_name="${application_name}-xrdp"
+				fi
 				;;
 			i)
 				echo "Starting interactive..."

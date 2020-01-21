@@ -4,12 +4,15 @@ FROM danielguerra/dockergui
 ENV USER_ID=1000
 ENV GROUP_ID=1000
 
+# Define mountable directories.
+VOLUME ["/config", "/dev/shm"]
+
 # Gui App Name
 ENV APP_NAME Firefox
 
 # Default resolution
-ENV WIDTH=1920
-ENV HEIGHT=1080
+ENV WIDTH=1280
+ENV HEIGHT=720
 
 # Use baseimage-docker's init system
 CMD ["/sbin/my_init"]
