@@ -25,7 +25,8 @@ RUN \
         adwaita-icon-theme \
         ttf-dejavu \
         ffmpeg-libs \
-        # The following package is used to send key presses to the X process.
+        libasound2 \
+	      # The following package is used to send key presses to the X process.
         xdotool
 
 # Set default settings.

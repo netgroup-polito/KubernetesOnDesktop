@@ -60,6 +60,7 @@ Interestingly, PulseAudio works on an audio server which typically is set to a l
 
 However, after many days of trials and installation, I am still not able to make it work, since we don't have a complete OS installation in our Docker images (to avoid useless overhead), thus I'm digging to find out one-by-one the needed packages/configuration. 
 
+<https://joshdata.wordpress.com/2009/02/11/pulseaudio-sound-forwarding-across-a-network/>
 <https://unix.stackexchange.com/questions/105964/launch-a-fake-minimal-x-session-for-pulseaudio-dbus>
 <https://unix.stackexchange.com/questions/138350/how-can-i-forward-sound-over-vnc>
 <https://joshdata.wordpress.com/2009/02/11/pulseaudio-sound-forwarding-across-a-network/>
