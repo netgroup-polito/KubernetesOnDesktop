@@ -258,7 +258,7 @@ function main() {
 
 	retrieve_screen_dim &>/dev/null
 
-	while getopts "ihd:etp:" opt; do
+	while getopts "ihd:et:p:" opt; do
   	case $opt in
 	    d)
 				echo "$OPTARG" | grep -P -q '\d+x\d+'
