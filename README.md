@@ -2,118 +2,116 @@
 
 Project duration: 6 person weeks
 
-Developer: **Simone Magnani**
+Developed by: **Simone Magnani**
 
 Tutor: **Fulvio Risso** - **Alex Palesandro**
 
-Version: 0.1
+Version: 1.0
 
 ## Description
 
 Cloud Computing course project with the aim of developing a cloud infrastructure to run user application in a remote cluster.
 
-Thanks to the Netgroup Polito cluster, we have developed a very high performing infrastructure to let correctly configured users deploy applications and connect to them both via vnc connection and browser.
+Thanks to the Netgroup Polito cluster, we have developed a very high performing infrastructure to let correctly configured users deploy applications and connect to them via many protocols.
 
 To make modifications persistent, we decided to create a PersistentVolumeClaim that the user uses as his *HOME* directory. Few improvements will be done to make all supported application choose that directory automatically by every file manager.
 
-Despite needing a Desktop Environment/Window Manager to run, all connections to the created deployment refer to a single application. Thus, it is not possible to perform any different operation different. The execution unit will be destroyed together with all the deployments once the user has finished to use it.
+The user is provided with a minimal Ubuntu installation containing all the software to make the environment work plus the one he requires. The actual program supported are Firefox and Libreoffice. The execution unit will be destroyed together with all the deployments once the user has finished to use it.
 
-Interestingly, depending on the connection quality and on the pod availability, the required application will be executed in Cloud or in the local user computer. This is a user-friendly feature not to alter the normal execution behaviour in certain particular cases.
+Interestingly, depending on the connection quality and on the pod availability, the required application will be executed in Cloud or in the local user computer. This is a user-friendly feature not to alter the normal execution behavior in certain particular cases.
+
+Everything is tunable user-side like connection quality, program executed, compression, encryption etc.
 
 ## Technologies used
 
-As you can see in the Acknowledgment section, we have reused some Docker images already developed by `jlesage`. Since they are composed by the same technologies we would like to use for our own images, we gently used them, in particular for firefox and baseimage-gui to develop all the other applications.
-
-In general, the software is composed by:
-
-* S6-overlay, a process supervisor for containers.
-* x11vnc, a X11 VNC server.
-*	xvfb, a X virtual framebuffer display server.
-*	openbox, a windows manager.
-*	noVNC, a HTML5 VNC client.
-*	NGINX, a high-performance HTTP server.
-*	stunnel, a proxy encrypting arbitrary TCP connections with SSL/TLS.
-*	Useful tools to ease container building.
-*	Environment to better support dockerized applications.
+* TigerVNC
+* NoVNC
+* SSH server
+* Xfce environment (supervisor, xfce4, xfce4-terminal, xterm) with Ubuntu 16.04 kernel
+* Some utility tools (vim, wget, net-tools, locales, bzip2, xdotool, python-numpy used for websockify/novnc)
+* Firefox/Libreoffice
 
 These not only allows our infrastructure to be reachable both via a VNC client and browser, but they also ensure that everything fits user needs and tastes.
 
 ## Dependencies
 
-* Kubernetes, more in detail `kubectl`
+* Kubectl
+* TigerVNC viewer
 * Netcat
-* iPerf
 
-While Kubectl is mandatory, Netcat can be replaced by other network software to check port availability. It is used by the script used to start the application to check that the remote node is correctly started. If you prefer using a different software, modify the appositely line in the `run_cloud.sh` where `nc` is used.
-
-Finally, to perform network measurement we used iPerf, an optimized software to accomplish our goal. The same principle described before for Netcat can be reused for iPerf, meaning that if you want to use a different software you can, but the script has to be accordingly modified.
+While Kubectl is mandatory, Netcat and TigerVNC viewer can be replaced by other application modifying the script. However, make sure that the ones you want to use are compatible with all the parameters (quality, compression), otherwise you may not achieve the same result.
 
 ## Supported Applications
 
-This is the first version of the project, so we preferred to focus on the quality of our services instead than the quality.
+This is the first version of the project, so we preferred to focus on the quality of our services instead than the quantity.
 
 The supported ones are:
 
 * Firefox
 * Libreoffice
 
+## How it works
+
+As first, network connectivity and speed is checked in order to decide whether to run the application locally or in the cluster. To accomplish that, we have used a simple `kubectl get pods` command, because it not only allows us to understand if network is up, but it also tells us your network/cluster condition. We could have used a `kubectl get version` command, but it is always very reactive and sometimes cached, while getting all pods (or every other resource) requires a bit of computation, which is cool to be considered.
+
+The second step is to modify the deployment file according to the user preferences. In fact, the template file contains all the possible combination of port/services used, and the `cloudify` script modifies them at every execution to deploy the desired system. Once finished, the deploy is applied to the cluster and, if it succeeds, the script looks for all the useful information like the IP to contact, the PORT opened for the services and the assigned pod name. Furthermore, in the mean time it is checked also if the user has its own SSH key pair in the default directory and, if he hasn't keys yet, a new RSA pair is generated. The SSH keys are extremely important, since they are used to map the remote pod PulseAudio local port to the user PulseAudio TCP server, launched later.
+
+Once gathered pod's information, the program waits for the pod to change it's state to RUNNING, meaning that it's ready to be contacted. Of course every phase has its own controls to be sure that the following step executes only if all the previous succeeded. In this phase the public RSA key is copied to the specific pod and it is started the local PulseAudio TCP server. The user is now ready to connect.
+
+The connection phase starts with a mandatory remote port forwarding for the audio and an optional local port forwarding for the encrypted VNC/noVNC connection, depending whether the encryption has been previously enable or not. If these command succeed, the connection starts using the right client (vncviewer or a browser).
+
+A huge difference between the two client is that if a vncviewer is used, the user has still the possibility to change at run time some parameter to tune the connection quality as he wants, while if it using noVNC this is not allowed.
+
+Finally, once the client terminates, the script handles the final phase, where the deploy is remotely deleted, the ssh connections are closed and the PulseAudio TCP server is shut down.
+
 ## Usage
 
 Once all the dependencies are installed, since it is a cloud based application you don't have to install anything else.
 
-The user must use the `run_cloud.sh` script to launch application. It is strongly suggested that he has a local installation of that application, since the script will automatically launch it if there are some connection or cluster availability errors.
+The user must use the `cloudify` script to launch application. It is strongly suggested that he has a local installation of that application, since the script will automatically launch it if there are some connection or cluster availability errors.
 
 To use it, type in a terminal:
 
 ```bash
-user@hostname:~/WorkingDirectory$ ./run_cloud.sh firefox
+user@hostname:~/WorkingDirectory$ ./cloudify firefox
 ```
 
 Actually there are a lot of optional parameter as reported in the script usage:
 
 ```bash
 Run application in Cloud using Kubernetes as orchestrator.
-Usage: ./run_cloud.sh [-h] [-i] [-e] [-d screen_resolution] [-t timeout] <application_name>
+Usage: ./cloudify [-h] [-e] [-t timeout] [-p protocol] [-q quality] [-c compression] app_name
 |-> -h: start the helper menu
-|-> -i: start the script in interactive mode (default non-interactive)
-|-> -e: specify that the connection must be encrypted (default 0)
-|-> -d: specify the resolution to be used (default actual screen dimensions)
-|-> -t: connection/wait timeout in seconds (default 60s)
-|-> -p: connection protocol to be used (default vnc, supports also xrdp and novnc)
+|-> -e: specify that the connection must be encrypted (0/1, default 0 disabled)
+|-> -t: connection/wait timeout in seconds (positive number, default 60)
+|-> -p: connection protocol to be used (vnc/novnc, default vnc)
+|-> -q: specify the quality of the connection (0-9, default 5)
+|-> -c: specify the compression of the connection (0-6, default 2)
 |
-|->Example: ./run_cloud.sh firefox
-|->Example: ./run_cloud.sh -d 1920x1080 -t 10 -e firefox
+|->Example: ./cloudify firefox
+|->Example: ./cloudify -q 7 -t 10 -e firefox
 ```
 
 If not specified, the default ones are the following:
 	
 * No encryption is used
-* Timeout = 60 seconds
-* Screen resolution = your actual screen one
-* Protocol = VNC
-* Non-interactive mode
+* Timeout: 60 seconds
+* Protocol: VNC
+* Quality: 4
+* Compression: 3
 
-Firefox over Vnc
+Since not only audio redirection but also encryption are performed via SSH, the user need to accept the the Pod's ssh fingerprint in order to establish the connection. Moreover, if your ssh keys are protected by a password (as usually are), you are required to type it in order to perform port forwarding.
 
-![Firefox over Vnc](res/Firefox.png)
+If everything was correct, a vncviewer window rendering the application will appear. Interestingly, you now not only can play the remote audio, but also controlling it. 
 
-Firefox over Http
+Firefox (VNC)
 
-![Firefox over Http](res/Firefox2.png)
+![Firefox using VNC](res/Firefox.png)
 
-## Known issues/lacks
+Firefox (noVNC)
 
-Due to the amount of time spent digging all the different technologies, the VNC version all the docker images doesn't support the audio streaming yet. In spite performing audio redirection using PulseAudio seems to be a very efficient and easy solution, installing all the needed packages from scratch on a docker is trickier than I thought. It requires analysis and PulseAudio knowledge.
+![Firefox using noVNC](res/Firefox2.png)
 
-## Audio streaming version
-
-To allow audio streaming and expose this demo, I used RDP (Remote Desktop Connection), a protocol developed by Microsoft which allows not only to see the remote desktop as VNC does, but it also redirect the audio, accomplishing our objective. In fact, an RDP connections allows you to decide whether the audio should be played locally (on the client computer via redirection) or remotely (on the server, using its audio device! In order to hear that you should physically be in the same place).
-
-This demo shows the Firefox use case.
-
-```bash
-
-```
 
 ## Acknowledgments
 
@@ -124,32 +122,3 @@ Professor Risso
 PhD Alex Palesandro
 
 * <https://github.com/palexster>
-
-jlesage
-
-* <https://hub.docker.com/r/jlesage/baseimage-gui>
-* <https://hub.docker.com/r/jlesage/firefox>
-* <https://github.com/jlesage/docker-baseimage-gui>
-* <https://github.com/jlesage/docker-firefox>
-
-## Other pointers
-
-* <https://hub.docker.com/r/selenium/standalone-firefox>
-* <https://github.com/SeleniumHQ/docker-selenium>
-* <https://github.com/kubernetes/examples/blob/master/staging/selenium/selenium-node-firefox-deployment.yaml>
-* <https://github.com/rook/rook/blob/master/cluster/examples/kubernetes/wordpress.yaml>
-* <https://tnichols.org/2015/10/19/Hooking-the-Linux-System-Call-Table/>
-* <https://kubernetes.io/docs/concepts/>
-* <https://medium.com/@SaravSun/running-gui-applications-inside-docker-containers-83d65c0db110>
-* <https://stackoverflow.com/questions/56398680/is-it-possible-to-deploy-a-gui-application-using-kubernetes>
-* <https://stackoverflow.com/questions/16296753/can-you-run-gui-applications-in-a-docker-container/43082473#43082473>
-* <https://xpra.org/trac/wiki/Usage>
-* <https://askubuntu.com/questions/203173/run-application-on-local-machine-and-show-gui-on-remote-display>
-* <https://blog.yadutaf.fr/2017/09/10/running-a-graphical-app-in-a-docker-container-on-a-remote-server/>
-* <https://github.com/atlassian/docker-chromium-xvfb/blob/master/images/base/xvfb-chromium>
-* <https://wiki.archlinux.org/index.php/TigerVNC>
-* <https://cweiske.de/tagebuch/running-apps-high-resolution.htm>
-* <https://www.cyberciti.biz/faq/install-and-configure-tigervnc-server-on-ubuntu-18-04/>
-* <https://github.com/ConSol/docker-headless-vnc-container/blob/master/src/ubuntu/install/tigervnc.sh>
-* <https://www.x.org/releases/X11R7.6/doc/man/man1/Xvfb.1.xhtml>
-* <https://en.wikipedia.org/wiki/X11vnc>

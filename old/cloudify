@@ -217,7 +217,7 @@ function clear_and_exit {
 #Print usage function
 function print_usage_and_exit {
 	echo "Run application in Cloud using Kubernetes as orchestrator."
-	echo "Usage: ./run_cloud.sh [-h] [-i] [-e] [-d screen_resolution] [-t timeout] <application_name>"
+	echo "Usage: ./cloudify [-h] [-i] [-e] [-d screen_resolution] [-t timeout] <application_name>"
 	echo "|-> -h: start the helper menu"
 	echo "|-> -i: start the script in interactive mode (default non-interactive)"
 	echo "|-> -e: specify that the connection must be encrypted (default 0)"
@@ -225,8 +225,8 @@ function print_usage_and_exit {
 	echo "|-> -t: connection/wait timeout in seconds (default 60s)"
 	echo "|-> -p: connection protocol to be used (default vnc, supports also xrdp and novnc)"
 	echo "|"
-	echo "|->Example: ./run_cloud.sh firefox"
-	echo "|->Example: ./run_cloud.sh -d 1920x1080 -t 10 -e firefox"
+	echo "|->Example: ./cloudify firefox"
+	echo "|->Example: ./cloudify -d 1920x1080 -t 10 -e firefox"
 	exit $1
 }
 

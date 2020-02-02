@@ -1,9 +1,14 @@
 #!/bin/bash
+set -e
 
+#Final state machine like
+state=0
+#Installation path
+folder="/opt/Cloudify"
 #Quality level for the connection
-quality=4
+quality=5
 #Compression level
-compression=3
+compression=2
 #Protocol to be used (default VNC)
 protocol="vnc"
 #Timeout to wait for the pod creation (expressed in seconds)
@@ -11,13 +16,11 @@ timeout=60
 #Seconds for the server response to consider a good connection
 connection_answer_time=1
 #The Persistent Volume Claim deployment
-pvcDeploy="kubernetes/volume.yaml"
+pvcDeploy="$folder/kubernetes/volume.yaml"
 #The target deployment file
-targetDeploy="kubernetes/deployment_audio.yaml"
+targetDeploy="$folder/kubernetes/deployment.yaml"
 #Variable to select connection type, 0=clear, 1=encrypted
 enc=0
-#Variable which tracks if the deployment has successfully been launched
-deployed=0
 #Pulseaudio port
 pulsePort=34567
 #List of supported apps
@@ -26,10 +29,7 @@ supported_protocols=("vnc" "novnc")
 
 #Set SECURE_CONNECTION to 1/0 depending on encryption
 function adjust_encription {
-	line=`grep -n 'SECURE_CONNECTION' ${targetDeploy} | cut -d : -f -1`
-	((line=line+1))
-
-	sed -i "${line}s/[0-1]/${enc}/" ${targetDeploy}	
+	sed -i "35s/[0-1]/${enc}/" ${targetDeploy}	
 }
 
 #Set application name in deployment
@@ -39,36 +39,17 @@ function adjust_appname {
 
 #Set the new generated token
 function adjust_token {
-	line=`grep -n 'VNC_PASSWORD' ${targetDeploy} | cut -d : -f -1`
-	((line=line+1))
-	
-	sed -i "${line}s/\".*\"/\"$1\"/" ${targetDeploy}
+	sed -i "32s/\".*\"/\"$1\"/" ${targetDeploy}
 }
 
-#Comment/Uncomment services and ports depending on protocol used
+#Remove services and ports depending on protocol used
 function adjust_protocol {
-	from_novnc_service=`grep -w -n 'novnc-svc-port' ${targetDeploy} | cut -d : -f -1`
-	((till_novnc_service=from_novnc_service+3))
-	from_vnc_service=`grep -w -n 'vnc-svc-port' ${targetDeploy} | cut -d : -f -1`
-	((till_vnc_service=from_vnc_service+3))
-	from_xrdp_service=`grep -w -n 'xrdp-svc-port' ${targetDeploy} | cut -d : -f -1`
-	((till_xrdp_service=from_xrdp_service+3))
-	from_novnc_container=`grep -w -n 'novnc-cont-port' ${targetDeploy} | cut -d : -f -1`
-	((till_novnc_container=from_novnc_container+1))
-	from_vnc_container=`grep -w -n 'vnc-cont-port' ${targetDeploy} | cut -d : -f -1`
-	((till_vnc_container=from_vnc_container+1))
-	
 	if [ $enc -eq 1 ]; then
-		sed -i "${from_vnc_service},${till_vnc_service} {s/^/#/}" ${targetDeploy}
-		sed -i "${from_vnc_container},${till_vnc_container} {s/^/#/}" ${targetDeploy}
-		sed -i "${from_novnc_service},${till_novnc_service} {s/^/#/}" ${targetDeploy}
-		sed -i "${from_novnc_container},${till_novnc_container} {s/^/#/}" ${targetDeploy}
+		sed -i '40,45d;70,77d' ${targetDeploy}
 	elif [ "$protocol" = "vnc" ]; then
-		sed -i "${from_novnc_service},${till_novnc_service} {s/^/#/}" ${targetDeploy}
-		sed -i "${from_novnc_container},${till_novnc_container} {s/^/#/}" ${targetDeploy}
+		sed -i '40,42d;70,73d' ${targetDeploy}
 	else
-		sed -i "${from_vnc_service},${till_vnc_service} {s/^/#/}" ${targetDeploy}
-		sed -i "${from_vnc_container},${till_vnc_container} {s/^/#/}" ${targetDeploy}
+		sed -i '43,45d;74,77d' ${targetDeploy}
 	fi
 }
 
@@ -83,20 +64,19 @@ function scan_node_port {
 	return 1
 }
 
-#Retrieving the IP/port of the node
+#Retrieving the ip, ports, pod name and namespace
 function retrieve_pod_info {
-	######## RETRIEVE POD NAME
-	targetPodName=`kubectl get pod -l app=${application_name} -o "jsonpath={.items..metadata.name}"`
-	targetPodNamespace=`kubectl get pod -l app=${application_name} -o "jsonpath={.items..metadata.namespace}"`
-	targetNodeIp=`kubectl get pod -l app=${application_name} -o "jsonpath={..status.hostIP}"`
-	targetNodePortProtocol=`kubectl get svc ${application_name}-service -o 'jsonpath={.spec.ports[?(@.name=="'${protocol}'-svc-port")].nodePort}'`
-	targetNodePortSsh=`kubectl get svc ${application_name}-service -o 'jsonpath={.spec.ports[?(@.name=="ssh-svc-port")].nodePort}'`
+	read -r targetNodeIp targetPodName targetPodNamespace <<<$(kubectl get pod -l app=firefox -o "jsonpath={..status.hostIP} {.items..metadata.name} {.items..metadata.namespace}")
+	read -r targetNodePortProtocol targetNodePortSsh <<<$(kubectl get svc -l app=firefox -o 'jsonpath={..spec.ports[?(@.name=="'${protocol}'-svc-port")].nodePort} {..spec.ports[?(@.name=="ssh-svc-port")].nodePort}')
 }
 
 #Function to connect to target
 function connect {
+	export SSH_ASKPASS="${PWD}/zenity_askpass"
+
 	# Forwarding sound
-	ssh -f -N -R ${pulsePort}:localhost:${pulsePort}  default@${targetNodeIp} -p ${targetNodePortSsh}
+	ssh -oStrictHostKeyChecking=no -f -N -R ${pulsePort}:localhost:${pulsePort}  default@${targetNodeIp} -p ${targetNodePortSsh}
+	((state=state+1))
 
 	if [ $enc -eq 1 ]; then
 		if [ "$protocol" = "vnc" ]; then
@@ -105,7 +85,7 @@ function connect {
 			port=5800;
 		fi
 		#Creating ssh tunnel for the protocol
-		ssh -f -N -L ${port}:localhost:${port}  default@${targetNodeIp} -p ${targetNodePortSsh}
+		ssh -oStrictHostKeyChecking=no -f -N -L ${port}:localhost:${port}  default@${targetNodeIp} -p ${targetNodePortSsh}
 	fi
 
 	if [ "$protocol" = "vnc" ]; then
@@ -132,7 +112,7 @@ function connect {
 		pid=`pgrep firefox`
 		((timeout=timeout*timeout))
 		
-		timeout $timeout "tail --pid=$pid -f /dev/null &>/dev/null"
+		timeout $timeout tail --pid=$pid -f /dev/null
 	fi
 	echo "OK"
 }
@@ -140,14 +120,14 @@ function connect {
 #Main function to start the deployment of the desired application
 function start_deploy {
 	#For safety let's copy the deployment and modify the temporary one
-	tmp_name="$(date +%F_%T).yaml"
-	cp ${targetDeploy} ./${tmp_name}
+	tmp_name="/tmp/Cloudify/$(date +%F_%T).yaml"
+	mkdir -p /tmp/Cloudify &>/dev/null
+	cp ${targetDeploy} $tmp_name
 	targetDeploy="$tmp_name"
-
-	#Register Ctr+C interrupt
-	trap clear_and_exit INT TERM
 	
-	adjust_encription && adjust_appname && adjust_protocol
+	adjust_encription
+	adjust_appname
+	adjust_protocol
 	
   #Checking connectivity
   #To perform that task, the command `kubectl describe pods` is used (we could use version, but too fast since tight)
@@ -175,31 +155,33 @@ function start_deploy {
 		
 			if [ $? -ge 0 ]; then
 				echo "OK"
-				deployed=1
+				#Register Ctr+C interrupt
+				trap clear_and_exit INT TERM KILL EXIT QUIT HUP
 				
+				echo -n "Retrieving node IP and PORT..."
+				retrieve_pod_info
+				echo "OK ip -> ${targetNodeIp}, $protocol -> ${targetNodePortProtocol}, ssh -> ${targetNodePortSsh}, podName -> ${targetPodName}, podNs -> ${targetPodNamespace}"
+					
+				if ! test -f "$HOME/.ssh/id_rsa.pub"; then
+					echo "Public ssh key not found, generating new one...";
+					ssh-keygen &>/dev/null
+					echo "OK"
+				fi
+
+				echo -n "Loading PulseAudio tcp module..."
+				pactl load-module module-native-protocol-tcp port=${pulsePort} auth-ip-acl=::1 &>/dev/null
+				echo "OK"
+				((state=state+1))
+
 				#Waiting for the pod to start
 				echo -n "Waiting for pod to start, max ${timeout}seconds..."
 				kubectl wait --for=condition=Ready pod -l "app=${application_name}" --timeout=${timeout}s &>/dev/null
 	
 				if [ $? -eq 0 ]; then
 					echo "OK pod running"
-					
-					echo -n "Retrieving node IP and PORT..."
-					retrieve_pod_info
-					echo "OK ${targetNodeIp}, $protocol -> ${targetNodePortProtocol}, ssh -> ${targetNodePortSsh}"
-					
-					if ! test -f "$HOME/.ssh/id_rsa.pub"; then
-						echo "Public ssh key not found, generating new one...";
-						ssh-keygen &>/dev/null
-						echo "OK"
-					fi
 
 					echo -n "Deploying public key to pod..."
 					kubectl cp ~/.ssh/id_rsa.pub ${targetPodNamespace}/${targetPodName}:/home/default/.ssh/authorized_keys
-					echo "OK"
-
-					echo -n "Loading PulseAudio tcp module..."
-					pactl load-module module-native-protocol-tcp port=${pulsePort} auth-ip-acl=::1
 					echo "OK"
 
 					echo -n "Waiting for the NodePort to be opened..."
@@ -229,36 +211,38 @@ function start_deploy {
 
 #Delete only the deployment NOT the volume
 function clear_and_exit {
-	if [ $deployed -eq 1 ]; then
+	echo -n "Deleting deploy on cluster..."
+	kubectl delete -f $targetDeploy &>/dev/null
+	echo "OK"
+	if [ $state -eq 2 ]; then
 		echo -n "Stopping ssh connections..."
 		pkill ssh
 		echo "OK"
-		echo -n "Deleting deploy on cluster..."
-		kubectl delete -f $targetDeploy &>/dev/null
-		echo "OK"
+	fi
+	if [[ $state -ge 1 ]]; then
 		echo -n "Unloading PulseAudio TCP module..."
-		pactl unload-module module-native-protocol-tcp
+		pactl unload-module module-native-protocol-tcp &>/dev/null
 		echo "OK"
 	fi
-	echo -n "Deleting deploy file..."
-	rm -f $targetDeploy
-	echo "OK"
+	#echo -n "Deleting deploy file..."
+	#rm -f $targetDeploy
+	#echo "OK"
 	exit $1
 }
 
 #Print usage function
 function print_usage_and_exit {
 	echo "Run application in Cloud using Kubernetes as orchestrator."
-	echo "Usage: ./run_cloud.sh [-h] [-i] [-e] [-d screen_resolution] [-t timeout] <application_name>"
+	echo "Usage: ./cloudify [-h] [-e] [-t timeout] [-p protocol] [-q quality] [-c compression] app_name"
 	echo "|-> -h: start the helper menu"
-	echo "|-> -e: specify that the connection must be encrypted (default disabled)"
-	echo "|-> -t: connection/wait timeout in seconds (default 60s)"
-	echo "|-> -p: connection protocol to be used (default vnc, supports also novnc)"
-	echo "|-> -q: specify the quality of the connection (0-9, default 4)"
-	echo "|-> -c: specify the compression of the connection (0-6, default 3)"
+	echo "|-> -e: specify that the connection must be encrypted (0/1, default 0 disabled)"
+	echo "|-> -t: connection/wait timeout in seconds (positive number, default $timeout)"
+	echo "|-> -p: connection protocol to be used (vnc/novnc, default $protocol)"
+	echo "|-> -q: specify the quality of the connection (0-9, default $quality)"
+	echo "|-> -c: specify the compression of the connection (0-6, default $compression)"
 	echo "|"
-	echo "|->Example: ./run_cloud.sh firefox"
-	echo "|->Example: ./run_cloud.sh -q 7 -t 10 -e firefox"
+	echo "|->Example: ./cloudify firefox"
+	echo "|->Example: ./cloudify -q 7 -t 10 -e firefox"
 	exit $1
 }
 
@@ -274,42 +258,38 @@ function main() {
   	case $opt in
 	    e)
 	      enc=1
-	      echo "Parameter ENCRYPTION...OK"
+	      echo "Parameter ENCRYPTION...OK activated"
 	      ;;
 	    t)
-				if [[ "$OPTARG" =~ ^[0-9]+$ ]]; then
-					timeout=$OPTARG
-					echo "Parameter TIMEOUT...OK ${timeout}"
-				else
-					echo "Parameter TIMEOUT...INVALID, using default one (${timeout} seconds)"
+				if [[ ! "$OPTARG" =~ ^[0-9]+$ ]]; then
+					print_usage_and_exit 1
 				fi
+				timeout=$OPTARG
+				echo "Parameter TIMEOUT...OK ${timeout}"
 	      ;;
 	    q)
-				if [[ "$OPTARG" =~ ^[0-9]$ ]]; then
-					quality=$OPTARG
-					echo "Parameter QUALITY...OK ${quality}"
-				else
-					echo "Parameter QUALITY...INVALID, using default one (${quality})"
+				if [[ ! "$OPTARG" =~ ^[0-9]$ ]]; then
+					print_usage_and_exit 1
 				fi
+				quality=$OPTARG
+				echo "Parameter QUALITY...OK ${quality}"
 				;;
 			c)
-				if [[ "$OPTARG" =~ ^[0-6]$ ]]; then
-					compression=$OPTARG
-					echo "Parameter QUALITY...OK ${compression}"
-				else
-					echo "Parameter COMPRESSION...INVALID, using default one (${compression})"
+				if [[ ! "$OPTARG" =~ ^[0-6]$ ]]; then
+					print_usage_and_exit 1
 				fi
+				compression=$OPTARG
+				echo "Parameter QUALITY...OK ${compression}"
 				;;
 	    h)
 				print_usage_and_exit 0
 				;;
 			p)
 				if ! ( IFS=$'\n'; echo "${supported_protocols[*]}" ) | grep -qFx "$OPTARG" &>/dev/null; then
-					echo "Protocol not supported, using the default one (${protocol})"
-				else
-					protocol="$OPTARG"
-					echo "Parameter PROTOCOL $OPTARG...OK"
+					print_usage_and_exit 1
 				fi
+				protocol="$OPTARG"
+				echo "Parameter PROTOCOL...OK $OPTARG"
 				;;
 	    \?)
 				print_usage_and_exit 1

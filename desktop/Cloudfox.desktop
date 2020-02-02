@@ -1,0 +1,19 @@
+[Desktop Entry]
+Comment[en_US]=
+Comment=
+Exec=sh -c "cloudify firefox"
+GenericName[en_US]=
+GenericName=
+Icon=cloudfox
+MimeType=
+Name[en_US]=Cloudfox
+Name=Cloudfox
+Path=
+StartupNotify=true
+Terminal=true
+TerminalOptions=
+Type=Application
+X-DBUS-ServiceName=
+X-DBUS-StartupType=none
+X-KDE-SubstituteUID=false
+X-KDE-Username=

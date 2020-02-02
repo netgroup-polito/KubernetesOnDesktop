@@ -1,17 +1,12 @@
 ## docker
 
-In this section there are all the docker imaged developed.
+In this section there is the official image used supporting also the audio feature. It has been built with both VNC and noVNC protocols and it supports the following applications:
 
-More in detail:
+* Firefox
+* Libreoffice
 
-* old: old and not performant version of docker images
-	* clear: images for a non-encrypted connection
-	* enc: images for an encrypted connection
-	* sshXForwarding: an experiment to see how ssh X session forwarding words (efficient, easier to setup but too slow due to entire session, even if faked, forwarding)
-* Firefox: the actual used Firefox image
-* Libreoffice: the actual used Libreoffice image
+Thanks to an intense use of templates, the image has many parameters tunable and modifiable "a posteriori", meaning that all the startup scripts will read those parameters at run time, letting the user modify them using the cloudify script.
 
-**NB**
+This image contains a complete Ubuntu 16.04 installation and the supported softwares. Even though most of the default packages are not useful in our scenario, I opted for installing the entire environment, because this way many features we would like to insert are already managed, like the audio. Moreover, I thought it could be useful to give the user a minimal environment with softwares like a File Manager, to manage its file and configuration, of course without root privileges. In fact, even though the docker starts as root to run many services like ssh server, the session is immediately switched to an unprivileged execution, to avoid that all incoming vnc/ssh connections damage it.
 
-Both the Firefox and Libreoffice images refer to `jlesage` base-gui docker image, which not only is very performing, but also well structured and organized. They are built on Alpine linux which is known to be lightweight and very secure, even though configuration can be not so intuitive for non-Alpine users. 
-Concerning the Firefox docker, I am trying to install also a pulseaudio suite to stream audio via tcp, this way the client can attach himself to that socket and reproduce audio using its own physical device. Unfortunately, since it requires time to dig deep all the modules to make audio streaming work, this features is not enabled yet.
+A special thanks goes to [consol](https://github.com/ConSol/docker-headless-vnc-container), which was a very inspiring project for the structure of mine.

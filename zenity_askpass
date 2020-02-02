@@ -1,0 +1,2 @@
+#!/bin/bash
+/usr/bin/zenity --password --title="SSH password prompt" --timeout=10
