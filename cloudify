@@ -157,10 +157,6 @@ function start_deploy {
 				echo "OK"
 				#Register Ctr+C interrupt
 				trap clear_and_exit INT TERM KILL EXIT QUIT HUP
-				
-				echo -n "Retrieving node IP and PORT..."
-				retrieve_pod_info
-				echo "OK ip -> ${targetNodeIp}, $protocol -> ${targetNodePortProtocol}, ssh -> ${targetNodePortSsh}, podName -> ${targetPodName}, podNs -> ${targetPodNamespace}"
 					
 				if ! test -f "$HOME/.ssh/id_rsa.pub"; then
 					echo "Public ssh key not found, generating new one...";
@@ -180,6 +176,10 @@ function start_deploy {
 				if [ $? -eq 0 ]; then
 					echo "OK pod running"
 
+					echo -n "Retrieving node IP and PORT..."
+					retrieve_pod_info
+					echo "OK ip -> ${targetNodeIp}, $protocol -> ${targetNodePortProtocol}, ssh -> ${targetNodePortSsh}, podName -> ${targetPodName}, podNs -> ${targetPodNamespace}"
+					
 					echo -n "Deploying public key to pod..."
 					kubectl cp ~/.ssh/id_rsa.pub ${targetPodNamespace}/${targetPodName}:/home/default/.ssh/authorized_keys
 					echo "OK"
