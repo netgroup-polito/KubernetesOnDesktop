@@ -8,6 +8,8 @@ Tutor: **Fulvio Risso** - **Alex Palesandro**
 
 Version: 1.0
 
+Presentation slides: [KubernetesOnDesktop](https://docs.google.com/presentation/d/15Dj8vwPaAyB_QmC_4886_E1K4pc7DzzlEPeiWJJMcCI/edit#slide=id.g742e3e7cd_1_16)
+
 ## Description
 
 Cloud Computing course project with the aim of developing a cloud infrastructure to run user application in a remote cluster.
