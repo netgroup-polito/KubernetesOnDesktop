@@ -1,6 +1,6 @@
 # Kubernetes On Desktop
 
-Project duration: 6 person weeks
+Project duration: 10 person weeks
 
 Developed by: **Simone Magnani**
 
