@@ -22,7 +22,7 @@ spec:
       containers:
       - name: XXXXXXXXXX-kubernetes
         image: s41m0n/ubuntu-vnc
-        imagePullPolicy: Always
+        imagePullPolicy: IfNotPresent
         env:
         #Local pod pulse server
         - name: "PULSE_SERVER"
@@ -62,7 +62,7 @@ kind: Service
 metadata:
   name: XXXXXXXXXX-service
   labels:
-    app: firefox
+    app: XXXXXXXXXX
 spec:
   selector:
     app: XXXXXXXXXX

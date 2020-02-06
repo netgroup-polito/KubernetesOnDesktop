@@ -52,9 +52,16 @@ The supported ones are:
 
 ## How it works
 
+For the sake of simplicity, in this draw it has been omitted the entire network infrastructure (routers, other servers on cluster, etc.) of the cluster, leaving only the element in question.  
+
+
+![Infrastructure](res/Infrastructure.png)
+
+### Deployment Phases
+
 As first, network connectivity and speed is checked in order to decide whether to run the application locally or in the cluster. To accomplish that, we have used a simple `kubectl get pods` command, because it not only allows us to understand if network is up, but it also tells us your network/cluster condition. We could have used a `kubectl get version` command, but it is always very reactive and sometimes cached, while getting all pods (or every other resource) requires a bit of computation, which is cool to be considered.
 
-The second step is to modify the deployment file according to the user preferences. In fact, the template file contains all the possible combination of port/services used, and the `cloudify` script modifies them at every execution to deploy the desired system. Once finished, the deploy is applied to the cluster and, if it succeeds, the script looks for all the useful information like the IP to contact, the PORT opened for the services and the assigned pod name. Furthermore, in the mean time it is checked also if the user has its own SSH key pair in the default directory and, if he hasn't keys yet, a new RSA pair is generated. The SSH keys are extremely important, since they are used to map the remote pod PulseAudio local port to the user PulseAudio TCP server, launched later.
+The second step is to modify the deployment file according to the user preferences. In fact, the template file contains all the possible combination of port/services used, and the `cloudify` script modifies them at every execution to deploy the desired system. Once finished, the deploy is applied to the cluster and, if it succeeds, the script looks for all the useful information like the IP to contact, the PORT opened for the services and the assigned pod name. Furthermore, in the mean time it is automatically generated a new SSH key pair with no passphrase to be used as authN for the new connection. The SSH keys are extremely important, since they are used to map the remote pod PulseAudio local port to the user PulseAudio TCP server, launched later.
 
 Once gathered pod's information, the program waits for the pod to change it's state to RUNNING, meaning that it's ready to be contacted. Of course every phase has its own controls to be sure that the following step executes only if all the previous succeeded. In this phase the public RSA key is copied to the specific pod and it is started the local PulseAudio TCP server. The user is now ready to connect.
 
@@ -63,6 +70,13 @@ The connection phase starts with a mandatory remote port forwarding for the audi
 A huge difference between the two client is that if a vncviewer is used, the user has still the possibility to change at run time some parameter to tune the connection quality as he wants, while if it using noVNC this is not allowed.
 
 Finally, once the client terminates, the script handles the final phase, where the deploy is remotely deleted, the ssh connections are closed and the PulseAudio TCP server is shut down.
+
+### SSH keys and One time Token
+
+As previously anticipated, each run generates a new SSH key pair in the directory `/tmp/Cloudify/` where also the used deployment has been copied. These information are one-shot, meaning that the next run will generate new ones starting from scratch. 
+
+Even though user chooses not to encrypt the connection, the vnc session, that in this case could be sniffed with a MITM attack, is still password-protected. The password is a One Time Token generated before applying the deploy remotely and will be used to connect to the pod both with the two protocols. In case of noVNC, a pop-up with your secret token will appear on your screen, allowing you to copy and paste it directly in your browser.
+
 
 ## Usage
 
@@ -85,8 +99,8 @@ Usage: ./cloudify [-h] [-e] [-t timeout] [-p protocol] [-q quality] [-c compress
 |-> -e: specify that the connection must be encrypted (0/1, default 0 disabled)
 |-> -t: connection/wait timeout in seconds (positive number, default 60)
 |-> -p: connection protocol to be used (vnc/novnc, default vnc)
-|-> -q: specify the quality of the connection (0-9, default 5)
-|-> -c: specify the compression of the connection (0-6, default 2)
+|-> -q: specify the quality of the connection (0-9, default 4)
+|-> -c: specify the compression of the connection (0-6, default 3)
 |
 |->Example: ./cloudify firefox
 |->Example: ./cloudify -q 7 -t 10 -e firefox
