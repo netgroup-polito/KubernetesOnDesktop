@@ -17,4 +17,3 @@ wait -n
 
 #Kill all the remaining background child processes
 pkill -P $$
-l

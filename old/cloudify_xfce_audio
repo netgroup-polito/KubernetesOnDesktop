@@ -5,9 +5,9 @@ state=0
 #Installation path
 folder="/opt/Cloudify"
 #Quality level for the connection
-quality=5
+quality=4
 #Compression level
-compression=2
+compression=3
 #Protocol to be used (default VNC)
 protocol="vnc"
 #Timeout to wait for the pod creation (expressed in seconds)
@@ -15,7 +15,7 @@ timeout=60
 #Seconds for the server response to consider a good connection
 connection_answer_time=1
 #The Persistent Volume Claim deployment
-pvcDeploy="$folder/kubernetes/volumes.yaml"
+pvcDeploy="$folder/kubernetes/volume.yaml"
 #The target deployment file
 targetDeploy="$folder/kubernetes/deployment.yaml"
 #Variable to select connection type, 0=clear, 1=encrypted
@@ -45,13 +45,6 @@ function adjust_token {
 	((line=line+1))
 	
 	sed -i "${line}s/\".*\"/\"$token\"/" ${targetDeploy}
-}
-
-function adjust_volumes {
-	from=`grep -n "${application_name}-persistent-storage" ${targetDeploy} | cut -d : -f -1`
-	((to=from+1))
-	
-	sed -i "${from},${to} {s/^#//g}" ${targetDeploy}
 }
 
 #Remove services and ports depending on protocol used
@@ -100,7 +93,7 @@ function connect {
 	#export SSH_ASKPASS="${PWD}/zenity_askpass"
 
 	# Forwarding sound
-	ssh -o UserKnownHostsFile=/dev/null -i "${working_dir}/id_rsa" -oStrictHostKeyChecking=no -f -N -R ${pulsePort}:localhost:${pulsePort}  vncuser@${targetNodeIp} -p ${targetNodePortSsh}
+	ssh -i "${working_dir}/id_rsa" -oStrictHostKeyChecking=no -f -N -R ${pulsePort}:localhost:${pulsePort}  default@${targetNodeIp} -p ${targetNodePortSsh}
 	((state=state+1))
 
 	if [ $enc -eq 1 ]; then
@@ -110,7 +103,7 @@ function connect {
 			port=5800;
 		fi
 		#Creating ssh tunnel for the protocol
-		ssh -o UserKnownHostsFile=/dev/null -i "${working_dir}/id_rsa" -oStrictHostKeyChecking=no -f -N -L ${port}:localhost:${port}  vncuser@${targetNodeIp} -p ${targetNodePortSsh}
+		ssh -i "${working_dir}/id_rsa" -oStrictHostKeyChecking=no -f -N -L ${port}:localhost:${port}  default@${targetNodeIp} -p ${targetNodePortSsh}
 	fi
 
 	if [ "$protocol" = "vnc" ]; then
@@ -123,7 +116,7 @@ function connect {
 			echo -n "Starting clear VNC connection..."
 			target="$targetNodeIp::$targetNodePortProtocol"
 		fi
-		vncviewer -CompressLevel $compression -QualityLevel $quality $target -passwd <(echo ${token} | vncpasswd -f) 2>/dev/null
+		vncviewer -FullScreen -CompressLevel $compression -QualityLevel $quality $target -passwd <(echo ${token} | vncpasswd -f) 2>/dev/null
 	else
 		if [ $enc -eq 1 ]; then
 			echo -n "Starting encrypted NOVnc connection..."
@@ -150,7 +143,6 @@ function start_deploy {
 	cp ${targetDeploy} "${working_dir}/deployment.yaml"
 	targetDeploy="${working_dir}/deployment.yaml"
 	
-	adjust_volumes
 	adjust_encription
 	adjust_appname
 	adjust_protocol
@@ -206,7 +198,7 @@ function start_deploy {
 					echo "OK ip -> ${targetNodeIp}, $protocol -> ${targetNodePortProtocol}, ssh -> ${targetNodePortSsh}, podName -> ${targetPodName}, podNs -> ${targetPodNamespace}"
 					
 					echo -n "Deploying public key to pod..."
-					kubectl cp "${working_dir}/id_rsa.pub" ${targetPodNamespace}/${targetPodName}:/home/vncuser/.ssh/authorized_keys
+					kubectl cp "${working_dir}/id_rsa.pub" ${targetPodNamespace}/${targetPodName}:/home/default/.ssh/authorized_keys
 					echo "OK"
 
 					echo -n "Waiting for the NodePort to be opened..."

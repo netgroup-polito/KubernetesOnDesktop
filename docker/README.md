@@ -5,8 +5,6 @@ In this section there is the official image used supporting also the audio featu
 * Firefox
 * Libreoffice
 
-Thanks to an intense use of templates, the image has many parameters tunable and modifiable "a posteriori", meaning that all the startup scripts will read those parameters at run time, letting the user modify them using the cloudify script.
+Thanks to an intense use of templates, the image can be easily built using the `vnc_audio/build.sh <app_name>` script passing as parameter the name of the application we want to install inside the docker (ex. Firefox). This way, the resulting image is lighter than a complete Linux installation and has only the service needed by the user.
 
-This image contains a complete Ubuntu 16.04 installation and the supported softwares. Even though most of the default packages are not useful in our scenario, I opted for installing the entire environment, because this way many features we would like to insert are already managed, like the audio. Moreover, I thought it could be useful to give the user a minimal environment with softwares like a File Manager, to manage its file and configuration, of course without root privileges. In fact, even though the docker starts as root to run many services like ssh server, the session is immediately switched to an unprivileged execution, to avoid that all incoming vnc/ssh connections damage it.
-
-A special thanks goes to [consol](https://github.com/ConSol/docker-headless-vnc-container), which was a very inspiring project for the structure of mine.
+The images creating using those build configurations have both video (vnc) and audio (PulseAudio) support, resulting in a complete and enjoyable user experience.

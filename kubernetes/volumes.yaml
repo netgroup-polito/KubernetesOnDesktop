@@ -1,0 +1,25 @@
+#Firefox preferences volume
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: firefox-pv-claim
+spec:
+  storageClassName: rook-ceph-block
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 100Mi
+---
+#Libreoffice Files
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: libreoffice-pv-claim
+spec:
+  storageClassName: rook-ceph-block
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 3Gi

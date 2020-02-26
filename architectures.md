@@ -65,6 +65,10 @@ However, after many days of trials and installation, I am still not able to make
 <https://unix.stackexchange.com/questions/138350/how-can-i-forward-sound-over-vnc>
 <https://joshdata.wordpress.com/2009/02/11/pulseaudio-sound-forwarding-across-a-network/>
 <https://github.com/mviereck/x11docker/wiki/Container-sound:-ALSA-or-Pulseaudio>
+<https://github.com/murer/docker-xvfb-x11vnc-openbox>
+
+<https://layerci.com/blog/container-tcp-tunnel/> (Not working the reverse method)
+<https://kubernetes.io/docs/tasks/access-application-cluster/port-forward-access-application-cluster/> (Waiting for future remote port forwarding feature, for PulseAudio)
 
 #### Commands to make it work in a complete Ubuntu installation
 ```

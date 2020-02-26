@@ -14,7 +14,7 @@ ENV TZ=Europe/Amsterdam
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
 # Install vnc, xvfb in order to create a 'fake' display and libreoffice
-RUN     apt-get install --fix-missing -y x11vnc xvfb firefox
+RUN     apt-get install --fix-missing -y x11vnc xvfb firefox pulseaudio
 
 # Setup a password
 RUN     mkdir ~/.vnc && x11vnc -storepasswd default ~/.vnc/passwd

@@ -16,9 +16,9 @@ Cloud Computing course project with the aim of developing a cloud infrastructure
 
 Thanks to the Netgroup Polito cluster, we have developed a very high performing infrastructure to let correctly configured users deploy applications and connect to them via many protocols.
 
-To make modifications persistent, we decided to create a PersistentVolumeClaim that the user uses as his *HOME* directory. Few improvements will be done to make all supported application choose that directory automatically by every file manager.
+To make modifications persistent, we decided to create a PersistentVolumeClaim for each different kind of application, thanks to all the users preferences are restored at every execution to improve the experience. 
 
-The user is provided with a minimal Ubuntu installation containing all the software to make the environment work plus the one he requires. The actual program supported are Firefox and Libreoffice. The execution unit will be destroyed together with all the deployments once the user has finished to use it.
+The actual program supported are Firefox and Libreoffice. The execution unit will be destroyed together with all the deployments once the user has finished to use it.
 
 Interestingly, depending on the connection quality and on the pod availability, the required application will be executed in Cloud or in the local user computer. This is a user-friendly feature not to alter the normal execution behavior in certain particular cases.
 
@@ -29,19 +29,19 @@ Everything is tunable user-side like connection quality, program executed, compr
 * TigerVNC
 * NoVNC
 * SSH server
-* Xfce environment (supervisor, xfce4, xfce4-terminal, xterm) with Ubuntu 16.04 kernel
-* Some utility tools (vim, wget, net-tools, locales, bzip2, xdotool, python-numpy used for websockify/novnc)
-* Firefox/Libreoffice
+* Openbox (light window manager)
+* Some utility tools (wget, net-tools, locales, xdotool, python-numpy used for websockify/novnc)
+* Firefox/Libreoffice (once per docker image)
 
 These not only allows our infrastructure to be reachable both via a VNC client and browser, but they also ensure that everything fits user needs and tastes.
 
 ## Dependencies
 
 * Kubectl
-* TigerVNC viewer
+* VNC viewer
 * Netcat
 
-While Kubectl is mandatory, Netcat and TigerVNC viewer can be replaced by other application modifying the script. However, make sure that the ones you want to use are compatible with all the parameters (quality, compression), otherwise you may not achieve the same result.
+While Kubectl is mandatory, Netcat and VNC viewer can be replaced by other application modifying the script. However, make sure that the ones you want to use are compatible with all the parameters (quality, compression), otherwise you may not achieve the same result.
 
 ## Supported Applications
 
@@ -84,7 +84,7 @@ Even though user chooses not to encrypt the connection, the vnc session, that in
 
 Once all the dependencies are installed, since it is a cloud based application you don't have to install anything else.
 
-The user must use the `cloudify` script to launch application. It is strongly suggested that he has a local installation of that application, since the script will automatically launch it if there are some connection or cluster availability errors.
+The user must use the `cloudify` script to launch application, or use the various desktop launchers created. It is strongly suggested that he has a local installation of that application, since the script will automatically launch it if there are some connection or cluster availability errors.
 
 To use it, type in a terminal:
 
@@ -107,16 +107,6 @@ Usage: ./cloudify [-h] [-e] [-t timeout] [-p protocol] [-q quality] [-c compress
 |->Example: ./cloudify firefox
 |->Example: ./cloudify -q 7 -t 10 -e firefox
 ```
-
-If not specified, the default ones are the following:
-	
-* No encryption is used
-* Timeout: 60 seconds
-* Protocol: VNC
-* Quality: 4
-* Compression: 3
-
-Since not only audio redirection but also encryption are performed via SSH, the user need to accept the the Pod's ssh fingerprint in order to establish the connection. Moreover, if your ssh keys are protected by a password (as usually are), you are required to type it in order to perform port forwarding.
 
 If everything was correct, a vncviewer window rendering the application will appear. Interestingly, you now not only can play the remote audio, but also controlling it. 
 

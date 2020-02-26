@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<openbox_menu xmlns="http://openbox.org/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://openbox.org/ file:///usr/share/openbox/menu.xsd">
+<menu id="root-menu" label="Openbox 3">
+  <item label="home">
+    <action name="Execute">
+      <execute>pcmanfm</execute>
+    </action>
+  </item>
+  <separator/>
+  <item label="logout">
+    <action name="Exit" />
+  </item>
+</menu>
+</openbox_menu>
