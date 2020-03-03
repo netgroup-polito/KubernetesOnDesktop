@@ -40,16 +40,14 @@ WORKDIR $ROOT_WORKDIR
 RUN apt-get update && \
     apt-get install -y wget\
                     openbox \
-                    tint2 \
-                    $APPLICATION \
-                    pcmanfm \
                     openssh-server \
-                    x11-xserver-utils \
                     locales \
                     x11-xkb-utils \
                     net-tools \
-                    python-numpy && \
-    apt -y autoremove && apt -y autoclean
+                    pulseaudio \
+                    python-numpy \
+                    $APPLICATION && \
+    apt -y autoclean
 
 ### Installing TigerVNC
 RUN wget -qO- https://dl.bintray.com/tigervnc/stable/tigervnc-1.8.0.x86_64.tar.gz | tar xz --strip 1 -C $NO_VNC_HOME
@@ -63,7 +61,9 @@ RUN mkdir -p $NO_VNC_HOME/utils/websockify && \
     ## create index.html to forward automatically to `vnc_lite.html`
     ln -s $NO_VNC_HOME/vnc_lite.html $NO_VNC_HOME/index.html
 
-### Generating Locale
+### To be used in case last APPLICATION release is broken, with -m in build.sh
+#APPLICATION_PLACEHOLDER
+
 RUN locale-gen en_US.UTF-8
 ENV LANG='en_US.UTF-8' LANGUAGE='en_US:en' LC_ALL='en_US.UTF-8'
 
@@ -76,13 +76,7 @@ RUN chmod +x /opt/config/*.sh
 
 ### Overwrite OpenBox config
 RUN rm -rf /etc/xdg/openbox && \
-    cp -R openbox /etc/xdg/openbox
-
-### Overwrite Tint2 config
-RUN rm -rf /etc/xdg/tint2 && \
-    cp -R tint2 /etc/xdg/tint2 && ls
-
-### Copying Desktop entry for tint2 to quit
-RUN cp obexit.desktop /usr/share/applications/
+    cp -R openbox /etc/xdg/openbox && \
+    mv /etc/xdg/openbox/${APPLICATION}.xml /etc/xdg/openbox/rc.xml
 
 CMD "/opt/config/docker-entrypoint.sh"
