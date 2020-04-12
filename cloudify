@@ -190,7 +190,7 @@ function start_deploy {
 				echo "OK"
 
 				echo -n "Loading PulseAudio tcp module..."
-				pactl load-module module-native-protocol-tcp port=${pulsePort} auth-ip-acl=::1 &>/dev/null
+				pactl load-module module-native-protocol-tcp port=${pulsePort} auth-ip-acl=127.0.0.1 &>/dev/null
 				echo "OK"
 				((state=state+1))
 

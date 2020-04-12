@@ -38,10 +38,15 @@ These not only allows our infrastructure to be reachable both via a VNC client a
 ## Dependencies
 
 * Kubectl
-* VNC viewer
+* VNC viewer (vncviewer command must exist)
+* vncpasswd (present in any vnc server package)
 * Netcat
 
 While Kubectl is mandatory, Netcat and VNC viewer can be replaced by other application modifying the script. However, make sure that the ones you want to use are compatible with all the parameters (quality, compression), otherwise you may not achieve the same result.
+
+**Note**
+
+Due to the usage of `vncpasswd` command to automatically encrypt the password from the command line, also the vncserver dependency should be installed. There are no current `vncpasswd` standalone installation.
 
 ## Supported Applications
 
