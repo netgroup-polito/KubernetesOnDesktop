@@ -13,7 +13,7 @@ protocol="vnc"
 #Timeout to wait for the pod creation (expressed in seconds)
 timeout=60
 #Seconds for the server response to consider a good connection
-connection_answer_time=1
+connection_answer_time=2
 #The Persistent Volume Claim deployment
 pvcDeploy="$folder/kubernetes/volumes.yaml"
 #The target deployment file
@@ -132,6 +132,9 @@ function connect {
 			echo -n "Starting clear NOVnc connection..."
 			url="http://$targetNodeIp:$targetNodePortProtocol"
 		fi
+		echo "OK"
+		echo ""
+		echo "Your token is ${token}, insert it into your browser"
 		notify-send -t 10000 -a 'Kubernetes on Desktop' "One time Token" "$token"
 		firefox $url &>/dev/null
 		pid=`pgrep firefox`
@@ -158,11 +161,10 @@ function start_deploy {
   #Checking connectivity
   #To perform that task, the command `kubectl describe pods` is used (we could use version, but too fast since tight)
   echo -n "Checking connectivity..."
-  nettime=$( TIMEFORMAT="%3U + %3S"; { time timeout 2 kubectl describe pods; } 2>&1)
+  nettime=`(/usr/bin/time -f "Time:%e" kubectl describe pods) 2>&1 | grep "Time:" | sed "s/^.*://"`
 
   if [ $? -eq 0 ]; then
   	#Parsing previous output to get sum of seconds
-  	nettime=$(echo ${nettime} | sed 's/,/./g' |  awk '{printf "%f", $1 + $2}')
 		
 		#Checking network speed availability
 		if [[ $(echo "${nettime}<${connection_answer_time}" | bc) -eq 1 ]]; then
@@ -177,7 +179,7 @@ function start_deploy {
 
 			echo -n "Applying deploy..."
 			#Start both deploy and volume
-  		kubectl apply -f $pvcDeploy &>/dev/null && kubectl apply -f $targetDeploy &>/dev/null
+  			kubectl apply -f $pvcDeploy &>/dev/null && kubectl apply -f $targetDeploy &>/dev/null
 		
 			if [ $? -ge 0 ]; then
 				echo "OK"
