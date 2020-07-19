@@ -25,6 +25,16 @@ pulsePort=34567
 #List of supported apps
 supported_apps=("firefox" "libreoffice")
 supported_protocols=("vnc" "novnc")
+#The vncviewer pod file
+tigervncPodFile="$folder/kubernetes/vncviewer.yaml"
+#vncviewer run mode (0-> native app, 1-> docker container, 2-> k8s pod)
+supported_run_modes=("0 (native app)" "1 (docker container)" "2 (k8s pod)")
+default_run_mode=0
+run_mode=$default_run_mode
+#TigerVNC viewer docker's name and version
+tigervnc_docker="r0ccard0/tigervnc:v1"
+tigervnc_dockerfile_path="$folder/docker/vncviewer"
+tigervnc_container_name="r0ccard0-tigervnc"
 
 #Set SECURE_CONNECTION to 1/0 depending on encryption
 function adjust_encription {
@@ -95,34 +105,31 @@ function retrieve_pod_info {
 	fi
 }
 
-#Function to connect to target
-function connect {
-	#export SSH_ASKPASS="${PWD}/zenity_askpass"
-
+#Function that runs the native vnc application
+function run_native_vncviewver_novnc_application {
 	# Forwarding sound
-	ssh -o UserKnownHostsFile=/dev/null -i "${working_dir}/id_rsa" -oStrictHostKeyChecking=no -f -N -R ${pulsePort}:localhost:${pulsePort}  vncuser@${targetNodeIp} -p ${targetNodePortSsh}
+	echo -n "Loading PulseAudio tcp module..."
+	pactl load-module module-native-protocol-tcp port=${pulsePort} auth-ip-acl=127.0.0.1 &>/dev/null
+	echo "OK"
 	((state=state+1))
+	#state=2 ; enc=0,1 ; run_mode=0
+	echo -n "Creating PulseAudio ssh tunnel..."
+	ssh -o UserKnownHostsFile=/dev/null -i "${working_dir}/id_rsa" -oStrictHostKeyChecking=no -f -N -R ${pulsePort}:localhost:${pulsePort}  vncuser@${targetNodeIp} -p ${targetNodePortSsh} &>/dev/null
+	echo "OK"
+	((state=state+1))
+	#state=3 ; enc=0,1 ; run_mode=0
 
 	if [ $enc -eq 1 ]; then
-		if [ "$protocol" = "vnc" ]; then
-			port=5900;
-		else
-			port=5800;
-		fi
 		#Creating ssh tunnel for the protocol
-		ssh -o UserKnownHostsFile=/dev/null -i "${working_dir}/id_rsa" -oStrictHostKeyChecking=no -f -N -L ${port}:localhost:${port}  vncuser@${targetNodeIp} -p ${targetNodePortSsh}
+		echo -n "Creating VNC ssh tunnel..."
+		ssh -o UserKnownHostsFile=/dev/null -i "${working_dir}/id_rsa" -oStrictHostKeyChecking=no -f -N -L ${port}:localhost:${port}  vncuser@${targetNodeIp} -p ${targetNodePortSsh} &>/dev/null
+		echo "OK"
+		((state=state+1))
+		#state=4 ; enc=1 ; run_mode=0
 	fi
 
+	#Check the protocol and run the corresponding native app
 	if [ "$protocol" = "vnc" ]; then
-		#Check encryption, if yes -> start vnc encrypted connection
-		#otherwise -> start normal vnc connection
-		if [ $enc -eq 1 ]; then
-			echo "Starting encrypted VNC connection..."
-			target="localhost::${port}"
-		else
-			echo -n "Starting clear VNC connection..."
-			target="$targetNodeIp::$targetNodePortProtocol"
-		fi
 		vncviewer -CompressLevel $compression -QualityLevel $quality $target -passwd <(echo ${token} | vncpasswd -f) 2>/dev/null
 	else
 		if [ $enc -eq 1 ]; then
@@ -142,11 +149,171 @@ function connect {
 		
 		timeout $timeout tail --pid=$pid -f /dev/null
 	fi
-	echo "OK"
+}
+
+#Function that creates the vncviewer container and launches it
+function create_container_and_launch_vncviewer {
+	#Remove existing container if any
+	docker container rm $tigervnc_container_name &>/dev/null
+
+	#Create the container and run vncviewer
+	echo "Running vncviewer docker..."
+	docker run --name $tigervnc_container_name \
+		-v ${working_dir}:/home/vnc/ssh_id_rsa \
+		-v /tmp/.X11-unix/:/tmp/.X11-unix/ \
+		-v /dev/snd:/dev/snd \
+		-v /dev/shm:/dev/shm \
+		-v /var/run/dbus:/var/run/dbus \
+		-e DISPLAY \
+		--privileged \
+		$tigervnc_docker \
+		enc=$1 `#enc` \
+		pod=0 `#pod` \
+		compression=$2 `#compression` \
+		quality=$3 `#quality` \
+		target=$4 `#target` \
+		token=$5 `#token` \
+		target_node_ip=$6 `#targetNodeIp` \
+		target_node_port_ssh=$7	`#targetNodePortSsh` \
+		enc_port=$8 `#port` \
+		&>/dev/null
+	((state=state+1))
+	#state=2 ; enc=0,1 ; run_mode=1
+}
+
+#Function to adjust the vncviewer.yaml file and apply the pod to k8s
+function adjust_and_apply_pod {
+	#For safety let's copy the pod file and modify the temporary one
+	cp ${tigervncPodFile} "${working_dir}/vncviewer.yaml"
+	tigervncPodFile="${working_dir}/vncviewer.yaml"
+
+	#Retrieveing the node_name and node_address
+	old_IFS=$IFS
+	IFS='#' read -r -a current_node_info <<< $(kubectl get nodes -l kubernetes.io/hostname=`cat /etc/hostname` -o 'jsonpath={range .items[0].status.addresses[*]}{.type}={.address}#{end}')
+	for ((i=0; i<${#current_node_info[@]}; i++)); do 
+		if [[ $(echo ${current_node_info[$i]} | cut -d '=' -f 1) == "Hostname" ]];then
+			current_node_name=$(echo ${current_node_info[$i]} | cut -d '=' -f 2)
+		fi
+		if [[ $(echo ${current_node_info[$i]} | cut -d '=' -f 1) == "InternalIP" ]];then
+			current_node_address=$(echo ${current_node_info[$i]} | cut -d '=' -f 2)
+		fi
+	done
+	IFS=$old_IFS
+
+	#Get a free tcp port to listen to
+	while true; do
+		#Generate random port number
+		pod_wait_port=$(shuf -i 1025-65535 -n 1)
+
+		read -r pod_port_to_check_local_ip <<< $(nc -zv localhost $pod_wait_port 2>&1)
+		read -r pod_port_to_check_localhost <<< $(nc -zv $current_node_address $pod_wait_port 2>&1)
+		#Check generated port
+		if [[ $( echo $pod_port_to_check_local_ip | grep succeeded) == "" ]] && \
+		   [[ $( echo $pod_port_to_check_localhost | grep succeeded) == "" ]]; then
+			#It's a free port. OK
+			break;
+		fi
+	done
+	
+	#Replace the pod parameters with their values
+	sed -i "s#RAR_001_K8S_NODE_NAME#$current_node_name#g" $tigervncPodFile
+	sed -i "s#RAR_002_TIGERVNC_CONTAINER_NAME#$tigervnc_container_name#g" $tigervncPodFile
+	sed -i "s#RAR_003_TIGERVNC_DOCKER#$tigervnc_docker#g" $tigervncPodFile
+	sed -i "s#RAR_004_ENC#enc=$enc#g" $tigervncPodFile
+	sed -i "s#RAR_005_POD#pod=1#g" $tigervncPodFile
+	sed -i "s#RAR_006_COMPRESSION#compression=$compression#g" $tigervncPodFile
+	sed -i "s#RAR_007_QUALITY#quality=$quality#g" $tigervncPodFile
+	sed -i "s#RAR_008_TARGET#target=$target#g" $tigervncPodFile
+	sed -i "s#RAR_009_TOKEN#token=$token#g" $tigervncPodFile
+	sed -i "s#RAR_010_TARGET_NODE_IP#target_node_ip=$targetNodeIp#g" $tigervncPodFile
+	sed -i "s#RAR_011_TARGET_NODE_PORT_SSH#target_node_port_ssh=$targetNodePortSsh#g" $tigervncPodFile
+	sed -i "s#RAR_012_ENC_PORT#enc_port=$port#g" $tigervncPodFile
+	sed -i "s#RAR_013_CLIENT_HOST_IP#client_host_ip=$current_node_address#g" $tigervncPodFile
+	sed -i "s#RAR_014_CLIENT_HOST_PORT#client_host_port=$pod_wait_port#g" $tigervncPodFile
+	sed -i "s#RAR_015_WORKING_DIR#$working_dir#g" $tigervncPodFile
+
+	#Applying the pod to the current node and wait for the process completion
+	kubectl apply -f $tigervncPodFile &>/dev/null
+	((state=state+1))
+	#state=2 ; enc=0,1 ; run_mode=2
+	echo "Waiting for the pod to be completed..."
+
+	pod_finished_can_exit=0
+	while [ $pod_finished_can_exit -eq 0 ]; do
+		while read line; do
+			if [ "$line" == 'Close' ]; then
+				pod_finished_can_exit=1
+				break
+			fi
+		done < <(nc -q -1 -l $pod_wait_port)
+	done
+}
+
+#Function to connect to target
+function connect {
+	#Set port depending on choosed protocol
+	if [ $enc -eq 1 ]; then
+		if [ "$protocol" = "vnc" ]; then
+			port=5900;
+		else
+			port=5800;
+		fi
+	fi
+
+	if [ "$protocol" = "vnc" ]; then
+		#Check encryption, if yes -> start vnc encrypted connection
+		#otherwise -> start normal vnc connection
+		if [ $enc -eq 1 ]; then
+			echo "Starting encrypted VNC connection..."
+			target="localhost::${port}"
+		else
+			echo "Starting clear VNC connection..."
+			target="$targetNodeIp::$targetNodePortProtocol"
+		fi
+	fi
+
+	case $run_mode in
+		0)	#Native app (N.B. the protocol could be vnc or novnc)
+			run_native_vncviewver_novnc_application
+			;;
+		1)	#Docker container (N.B. the protocol must be vnc)
+			create_container_and_launch_vncviewer ${enc} ${compression} ${quality} ${target} ${token} ${targetNodeIp} ${targetNodePortSsh} ${port}
+			;;
+		2)	#K8s pod (N.B. the protocol must be vnc)
+			adjust_and_apply_pod ${enc} ${compression} ${quality} ${target} ${token} ${port} ${targetNodeIp} ${targetNodePortSsh}
+			echo "Completed."
+			;;
+		\?)	#Unsupported run_mode
+			echo "ERROR: Unsupported run_mode $run_mode"
+			clear_and_exit 1
+			;;
+	esac
+	echo "VNC execution completed."
 }
 
 #Main function to start the deployment of the desired application
 function start_deploy {
+	#If run mode is docker => checking whether the docker image already exists or not and in the latter case crate it
+	if [ $run_mode -eq 1 ]; then
+		docker inspect $tigervnc_docker &>/dev/null
+		if [[ $? == 1 ]]; then
+			echo -n "The vncviewer image doesn't exist and will be created..."
+			tmp_prev_dir=$(pwd)
+			cd $tigervnc_dockerfile_path
+			docker build -t $tigervnc_docker . &>/dev/null
+			if [[ $? != 0 ]]; then
+				echo ""
+				echo "Error during vncviewer image build, running ${application_name} locally."
+				${application_name} &>/dev/null &
+				clear_and_exit 1
+			fi
+			cd $tmp_prev_dir
+			echo "Done."
+		else
+			echo "The vncviewer image already exists"
+		fi
+	fi
+
 	#For safety let's copy the deployment and modify the temporary one
 	working_dir="/tmp/Cloudify/$(date +%F_%H-%M-%S)"
 	mkdir -p $working_dir &>/dev/null
@@ -158,14 +325,12 @@ function start_deploy {
 	adjust_appname
 	adjust_protocol
 	
-  #Checking connectivity
-  #To perform that task, the command `kubectl describe pods` is used (we could use version, but too fast since tight)
-  echo -n "Checking connectivity..."
-  nettime=`(/usr/bin/time -f "Time:%e" kubectl describe pods) 2>&1 | grep "Time:" | sed "s/^.*://"`
+	#Checking connectivity
+	#To perform that task, the command `kubectl describe pods` is used (we could use version, but too fast since tight)
+	echo -n "Checking connectivity..."
+	nettime=`(/usr/bin/time -f "Time:%e" kubectl describe pods) 2>&1 | grep "Time:" | sed "s/^.*://"`
 
-  if [ $? -eq 0 ]; then
-  	#Parsing previous output to get sum of seconds
-		
+	if [ $? -eq 0 ]; then			
 		#Checking network speed availability
 		if [[ $(echo "${nettime}<${connection_answer_time}" | bc) -eq 1 ]]; then
 			
@@ -179,8 +344,9 @@ function start_deploy {
 
 			echo -n "Applying deploy..."
 			#Start both deploy and volume
-  			kubectl apply -f $pvcDeploy &>/dev/null && kubectl apply -f $targetDeploy &>/dev/null
-		
+			kubectl apply -f $pvcDeploy &>/dev/null && kubectl apply -f $targetDeploy &>/dev/null
+			((state=state+1))
+			#state=1 ; enc=0,1 ; run_mode=0,1,2
 			if [ $? -ge 0 ]; then
 				echo "OK"
 				#Register Ctr+C interrupt
@@ -190,11 +356,6 @@ function start_deploy {
 				echo -n "Generating ssh key pair..."
 				ssh-keygen -t rsa -b 4096 -C "${USER}@kubernetes.io" -f "${working_dir}/id_rsa" -N "" &>/dev/null
 				echo "OK"
-
-				echo -n "Loading PulseAudio tcp module..."
-				pactl load-module module-native-protocol-tcp port=${pulsePort} auth-ip-acl=127.0.0.1 &>/dev/null
-				echo "OK"
-				((state=state+1))
 
 				#Waiting for the pod to start
 				echo -n "Waiting for pod to start, max ${timeout}seconds..."
@@ -232,43 +393,82 @@ function start_deploy {
 		fi
 	else
 		echo "ERROR no Internet, running ${application_name} locally"
-  fi
+	fi
 	${application_name} &>/dev/null &
 }
 
 #Delete only the deployment NOT the volume
 function clear_and_exit {
 	trap - INT TERM KILL EXIT QUIT HUP
-	echo -n "Deleting deploy on cluster..."
-	kubectl delete -f $targetDeploy &>/dev/null
-	echo "OK"
-	if [[ $state -ge 1 ]]; then
+
+	if [ $state -ge 3 ]; then
+		#Stop ssh VNC and/or PulseAudio tunnel
+		echo -n "Stopping SSH VNC and/or PulseAudio tunnel..."
+		pkill ssh &>/dev/null
+		echo "OK"
+	fi
+
+	if [ $state -ge 2 ] && [ $run_mode -eq 2 ]; then
+		#Deleteing the pod that was executing vncviewer
+		echo -n "Deleting the vncviewer pod..."
+		kubectl delete -f $tigervncPodFile &>/dev/null
+		echo "OK"
+	fi
+
+	if [ $state -ge 2 ] && [ $run_mode -eq 1 ]; then
+		#Deleting the container that was executing vncviewer
+		echo -n "Deleting the vncviewer container..."
+		docker container rm $tigervnc_container_name &>/dev/null
+		echo "OK"
+	fi
+
+	if [ $state -ge 2 ] && [ $run_mode -eq 0 ]; then
+		#Unloading PulseAudio TCP module
 		echo -n "Unloading PulseAudio TCP module..."
 		pactl unload-module module-native-protocol-tcp &>/dev/null
 		echo "OK"
 	fi
-	if [ $state -eq 2 ]; then
-		echo -n "Stopping ssh connections..."
-		pkill ssh
+
+	if [ $state -ge 1 ]; then
+		#Deleting deploy on cluster
+		echo -n "Deleting deploy on cluster..."
+		kubectl delete -f $targetDeploy &>/dev/null
 		echo "OK"
 	fi
+
+	echo "Process completed"
 	exit $1
 }
 
 #Print usage function
 function print_usage_and_exit {
 	echo "Run application in Cloud using Kubernetes as orchestrator."
-	echo "Usage: ./cloudify [-h] [-e] [-t timeout] [-p protocol] [-q quality] [-c compression] app_name"
+	echo "Usage: ./cloudify [-h] [-e] [-t timeout] [-p protocol] [-q quality] [-c compression] [-r runmode] app_name"
 	echo "|-> -h: start the helper menu"
 	echo "|-> -e: specify that the connection must be encrypted (0/1, default 0 disabled)"
 	echo "|-> -t: connection/wait timeout in seconds (positive number, default $timeout)"
 	echo "|-> -p: connection protocol to be used (vnc/novnc, default $protocol)"
 	echo "|-> -q: specify the quality of the connection (0-9, default $quality)"
 	echo "|-> -c: specify the compression of the connection (0-6, default $compression)"
+	echo "|-> -r: vncviewer run mode:" 
+	echo "|       0-> native app"
+	echo "|       1-> docker container" 
+	echo "|       2-> k8s pod"
+	echo "|       default-> ${supported_run_modes[$default_run_mode]}." 
+	echo "|       Warning: this option can't be used if '-p novnc' is set"
 	echo "|"
 	echo "|->Example: ./cloudify firefox"
 	echo "|->Example: ./cloudify -q 7 -t 10 -e firefox"
+	echo "|->Example: ./cloudify -q 7 -t 10 -e -r 1 firefox"
 	exit $1
+}
+
+#Function to check options conflicts
+function check_opts_conflicts {
+	if [[ $run_mode =~ ^[1-2]$ ]] && [[ $protocol == "novnc" ]]; then
+		printf "ERROR: Can't be used 1 or 2 as parameter in -r option when \"novlc\" protocol is set\n\n"
+		print_usage_and_exit 1
+	fi
 }
 
 function main() {
@@ -279,20 +479,20 @@ function main() {
 		print_usage_and_exit 1
 	fi
 
-	while getopts "hec:q:t:p:" opt; do
-  	case $opt in
-	    e)
-	      enc=1
-	      echo "Parameter ENCRYPTION...OK activated"
-	      ;;
-	    t)
+	while getopts "hec:q:t:p:r:" opt; do
+		case $opt in
+			e)
+				enc=1
+				echo "Parameter ENCRYPTION...OK activated"
+				;;
+			t)
 				if [[ ! "$OPTARG" =~ ^[0-9]+$ ]]; then
 					print_usage_and_exit 1
 				fi
 				timeout=$OPTARG
 				echo "Parameter TIMEOUT...OK ${timeout}"
-	      ;;
-	    q)
+				;;
+			q)
 				if [[ ! "$OPTARG" =~ ^[0-9]$ ]]; then
 					print_usage_and_exit 1
 				fi
@@ -306,7 +506,7 @@ function main() {
 				compression=$OPTARG
 				echo "Parameter COMPRESSION...OK ${compression}"
 				;;
-	    h)
+			h)
 				print_usage_and_exit 0
 				;;
 			p)
@@ -316,12 +516,20 @@ function main() {
 				protocol="$OPTARG"
 				echo "Parameter PROTOCOL...OK $OPTARG"
 				;;
-	    \?)
+			r)
+				if [[ ! "$OPTARG" =~ ^[0-2]$ ]]; then
+					print_usage_and_exit 1
+				fi
+				run_mode=$OPTARG
+				echo "Parameter RUN MODE...OK => Run as ${supported_run_modes[$run_mode]}"
+				;;
+			\?)
 				print_usage_and_exit 1
-	      ;;
-	  esac
+				;;
+		esac
 	done
 
+	check_opts_conflicts
 	start_deploy
 	clear_and_exit 0
 }

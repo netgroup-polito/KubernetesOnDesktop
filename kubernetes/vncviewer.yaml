@@ -1,0 +1,75 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: r0ccard0-tigervnc
+  labels:
+    app: r0ccard0-tigervnc
+spec:
+  template:
+    spec:
+      nodeName: RAR_001_K8S_NODE_NAME # schedule pod to specific node. Replace value with appropriate nodeName
+      containers:
+        - name: RAR_002_TIGERVNC_CONTAINER_NAME #Replace value with appropriate container name
+          image: RAR_003_TIGERVNC_DOCKER        #Replace value with appropriate docker image name
+          env:
+            - name: DISPLAY
+              value: :0
+          stdin: true
+          tty: true
+          imagePullPolicy: IfNotPresent
+          volumeMounts:
+            - mountPath: /home/vnc/ssh_id_rsa
+              name: workingdir
+            - mountPath: /tmp/.X11-unix
+              name: video
+            - mountPath: /dev/snd
+              name: sound
+            - mountPath: /dev/shm
+              name: tempsystem
+            - mountPath: /var/run/dbus
+              name: systembus
+          securityContext:
+            privileged: true
+          args: 
+            - "RAR_004_ENC"
+            - "RAR_005_POD"
+            - "RAR_006_COMPRESSION"
+            - "RAR_007_QUALITY"
+            - "RAR_008_TARGET"
+            - "RAR_009_TOKEN"
+            - "RAR_010_TARGET_NODE_IP"
+            - "RAR_011_TARGET_NODE_PORT_SSH"
+            - "RAR_012_ENC_PORT"
+            - "RAR_013_CLIENT_HOST_IP"
+            - "RAR_014_CLIENT_HOST_PORT"
+          #Replace args with appropriate values
+          resources:
+            requests:
+              memory: "2048Mi"
+              cpu: "500m"
+            limits:
+              memory: "3072Mi"
+              cpu: "756m" #=0.75cpu
+      volumes:
+        - name: workingdir
+          hostPath:
+            path: RAR_015_WORKING_DIR   #Replace value with appropriate working dir
+        - name: video
+          hostPath:
+            path: /tmp/.X11-unix    # directory location on host
+        - name: sound
+          hostPath:
+            path: /dev/snd
+        - name: tempsystem
+          hostPath:
+            path: /dev/shm
+        - name: systembus
+          hostPath:
+            path: /var/run/dbus
+      tolerations:
+        - key: "key"
+          operator: "Equal"
+          value: "value"
+          effect: "NoSchedule"
+      restartPolicy: Never
+      terminationGracePeriodSeconds: 0

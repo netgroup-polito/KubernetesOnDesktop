@@ -26,3 +26,10 @@ rm -f /home/$SUDO_USER/.local/share/applications/Cloudlibre.desktop \
 
 echo "Removing old deploy files"
 rm -rf /tmp/Cloudify
+
+echo ""
+echo "WARNING:"
+echo "If you added your user in the 'docker' group after the cloudify installation"
+echo "and you don't need it anymore, please remember to remove it from 'docker' group"
+echo "(e.g. by using 'gpasswd -d $SUDO_USER docker' command and logout/login the account"
+echo "to take effect)."
