@@ -35,6 +35,8 @@ run_mode=$default_run_mode
 tigervnc_docker="r0ccard0/tigervnc:v1"
 tigervnc_dockerfile_path="$folder/docker/vncviewer"
 tigervnc_container_name="r0ccard0-tigervnc"
+#TigerVNC viewer pod app name
+tigervnc_pod_app_name="r0ccard0-tigervnc"
 
 #Set SECURE_CONNECTION to 1/0 depending on encryption
 function adjust_encription {
@@ -158,7 +160,7 @@ function create_container_and_launch_vncviewer {
 
 	#Create the container and run vncviewer
 	echo "Running vncviewer docker..."
-	docker run --name $tigervnc_container_name \
+	docker run -d --name $tigervnc_container_name \
 		-v ${working_dir}:/home/vnc/ssh_id_rsa \
 		-v /tmp/.X11-unix/:/tmp/.X11-unix/ \
 		-v /dev/snd:/dev/snd \
@@ -177,8 +179,20 @@ function create_container_and_launch_vncviewer {
 		target_node_port_ssh=$7	`#targetNodePortSsh` \
 		enc_port=$8 `#port` \
 		&>/dev/null
+
+	#Check docker run exit code to see if a container error occurred
+	if [[ $? -ne 0 ]]; then
+		echo "Error: can't run the docker container"
+		clear_and_exit 3
+	fi
+
 	((state=state+1))
 	#state=2 ; enc=0,1 ; run_mode=1
+
+	#Wait for the docker to complete its execution
+	echo "Wait for the docker to complete its execution..."
+	docker wait $tigervnc_container_name &>/dev/null
+	echo "Done."
 }
 
 #Function to adjust the vncviewer.yaml file and apply the pod to k8s
@@ -199,6 +213,18 @@ function adjust_and_apply_pod {
 		fi
 	done
 	IFS=$old_IFS
+
+	#Check that currente node name != "" and exists in the cluster
+	if [[ $current_node_name == "" ]] || [[ $(kubectl get node | grep $current_node_name) == "" ]]; then
+		echo "Error: Wrong node name. '$current_node_name' is not a cluster node name."
+		clear_and_exit 4
+	fi
+
+	#Check that internalIP has xxx.xxx.xxx.xxx template and corresponds to the one bound to the current node name
+	if [[ $current_node_address != $(grep -oE '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}' <<< $(kubectl get node -o wide | grep "rar-k8s-client-01")) ]]; then
+		echo "Error: Wrong node IP address."
+		clear_and_exit 5
+	fi
 
 	#Get a free tcp port to listen to
 	while true; do
@@ -233,9 +259,21 @@ function adjust_and_apply_pod {
 	sed -i "s#RAR_015_WORKING_DIR#$working_dir#g" $tigervncPodFile
 
 	#Applying the pod to the current node and wait for the process completion
-	kubectl apply -f $tigervncPodFile &>/dev/null
-	((state=state+1))
+	kubectl apply -f $tigervncPodFile &>/dev/null && ((state++))
 	#state=2 ; enc=0,1 ; run_mode=2
+
+	#Waiting for the pod to start
+	echo -n "Waiting for vncviewer pod to start, max ${timeout} seconds..."
+	kubectl wait --for=condition=Ready pod -l "app=${tigervnc_pod_app_name}" --timeout=${timeout}s &>/dev/null
+
+	#Check that vncviewer pod is running, otherwise exit
+	if [ $? -ne 0 ]; then
+		echo "Error: cannot create vncviewer pod."
+		clear_and_exit 6
+	else
+		echo "OK pod running"
+	fi
+
 	echo "Waiting for the pod to be completed..."
 
 	pod_finished_can_exit=0
@@ -285,7 +323,7 @@ function connect {
 			;;
 		\?)	#Unsupported run_mode
 			echo "ERROR: Unsupported run_mode $run_mode"
-			clear_and_exit 1
+			clear_and_exit 2
 			;;
 	esac
 	echo "VNC execution completed."
@@ -328,7 +366,7 @@ function start_deploy {
 	#Checking connectivity
 	#To perform that task, the command `kubectl describe pods` is used (we could use version, but too fast since tight)
 	echo -n "Checking connectivity..."
-	nettime=`(/usr/bin/time -f "Time:%e" kubectl describe pods) 2>&1 | grep "Time:" | sed "s/^.*://"`
+	nettime=`(/usr/bin/time -f "Time:%e" kubectl describe pods) 2>&1 | tail -1 | grep "Time:" | sed "s/^.*://"`
 
 	if [ $? -eq 0 ]; then			
 		#Checking network speed availability
@@ -344,8 +382,17 @@ function start_deploy {
 
 			echo -n "Applying deploy..."
 			#Start both deploy and volume
-			kubectl apply -f $pvcDeploy &>/dev/null && kubectl apply -f $targetDeploy &>/dev/null
-			((state=state+1))
+
+			#Apply both the pvc and the deploy and increment state variable at the end. This way:
+			# 1- If there's a 'Ctrl+C' between the two apply we don't run the risk of don't clear the resources already allocated due to the fact that
+			#    the state was not incremented yet (if state++ would be done afterwards);
+			# 2- We don't run the risk of a wrong exit status check afterwards due to the fact that if the state is incremented after the apply 
+			#	 (even if it fails) the $? variable is 0 because ((state++)) doesn't fail;
+			# 3- We don't run the risk of clear resources non allocated yet by increment the state before the apply.
+			# N.B.: It works because:
+			# a- if the second apply fails the state increment will not be done and the resources will not be allocated
+			# b- we don't care about the first apply because the pvc will never be deleted
+			kubectl apply -f $pvcDeploy &>/dev/null && kubectl apply -f $targetDeploy &>/dev/null && ((state++))
 			#state=1 ; enc=0,1 ; run_mode=0,1,2
 			if [ $? -ge 0 ]; then
 				echo "OK"
@@ -418,7 +465,7 @@ function clear_and_exit {
 	if [ $state -ge 2 ] && [ $run_mode -eq 1 ]; then
 		#Deleting the container that was executing vncviewer
 		echo -n "Deleting the vncviewer container..."
-		docker container rm $tigervnc_container_name &>/dev/null
+		docker container rm -f $tigervnc_container_name &>/dev/null
 		echo "OK"
 	fi
 
@@ -436,7 +483,13 @@ function clear_and_exit {
 		echo "OK"
 	fi
 
-	echo "Process completed"
+	#Check if an error occurred and run application locally
+	if [ $1 -ne 0 ]; then
+		echo "Running ${application_name} locally"
+	else
+		echo "Process completed"
+	fi
+	
 	exit $1
 }
 

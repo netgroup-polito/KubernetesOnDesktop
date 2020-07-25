@@ -6,6 +6,9 @@ metadata:
     app: r0ccard0-tigervnc
 spec:
   template:
+    metadata:
+      labels:
+        app: r0ccard0-tigervnc
     spec:
       nodeName: RAR_001_K8S_NODE_NAME # schedule pod to specific node. Replace value with appropriate nodeName
       containers:
