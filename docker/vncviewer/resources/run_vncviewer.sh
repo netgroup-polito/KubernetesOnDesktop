@@ -77,9 +77,23 @@ state=0                                                                       #
 ###############################################################################
 
 ###############################################################################
-#                   USER READABLE CONST MATCHING PARAMS                       #
+#                   HUMAN READABLE CONST MATCHING PARAMS                      #
 ###############################################################################
-#                                                                             # TODO
+enc="PARAMS[${PARAM_KEYS[0]}]"                                                #
+pod="PARAMS[${PARAM_KEYS[1]}]"                                                #
+compression="PARAMS[${PARAM_KEYS[2]}]"                                        #
+quality="PARAMS[${PARAM_KEYS[3]}]"                                            #
+target="PARAMS[${PARAM_KEYS[4]}]"                                             #
+token="PARAMS[${PARAM_KEYS[5]}]"                                              #
+target_node_ip="PARAMS[${PARAM_KEYS[6]}]"                                     #
+target_node_port_ssh="PARAMS[${PARAM_KEYS[7]}]"                               #
+enc_port="PARAMS[${PARAM_KEYS[8]}]"                                           #
+client_host_ip="PARAMS[${PARAM_KEYS[9]}]"                                     #
+client_host_port="PARAMS[${PARAM_KEYS[10]}]"                                  #
+#                                                                             #
+# N.B.:                                                                       #
+# Use the variable above as a ref. It means this way ${!<varname>}            #
+# Example: to retrieve the enc value use ${!enc}                              #
 ###############################################################################
 
 #--------End of parameters, global variables and constants declaration--------#
@@ -93,9 +107,10 @@ function init {
 }
 
 #Function to communicate to cloudify that the pod execution is completed
+#For authentication purpose and to avoid MITM attacks we also send the token
 function close_connection {
-nc ${PARAMS[${PARAM_KEYS[9]}]} ${PARAMS[${PARAM_KEYS[10]}]} <<-EOF 1>&2
-    Close
+nc ${!client_host_ip} ${!client_host_port} <<-EOF 1>&2
+    Close_${!token}
 
 EOF
 }
@@ -104,10 +119,10 @@ EOF
 function clean_and_exit {
     #If enc=1 ane state>=4 ssh vnc tunnel and ssh pulseaudio tunnel are alive => Close the tunnels
     #If enc=0,1 and and state>=3 ssh vnc tunnel is alive => Close the tunnel
-    if [[ ${PARAMS[${PARAM_KEYS[0]}]} -eq 1 && $state -ge 4 ]] || [[ $state -ge 3 ]]; then
+    if [[ ${!enc} -eq 1 && $state -ge 4 ]] || [[ $state -ge 3 ]]; then
         echo "Closing ssh PulseAudio and/or VNC tunnel(s) connection..." 1>&2
-        pkill ssh 1>&2
-        echo "vnc tunnel connection closed." 1>&2
+        ssh -S "${SSH_SOCKET}/ssh_socket:${!target_node_port_ssh}" -O "exit" vncuser@${!target_node_ip} 1>&2
+        echo "PulseAudio/VNC tunnel connection closed." 1>&2
     fi
 
     # If state>=2 PulseAudio TCP module has been already loaded => Unload it
@@ -126,11 +141,13 @@ function clean_and_exit {
     fi
 
     #If pod=1 => communicate to cloudify that the pod execution is completed
-    if [[ ${PARAMS[${PARAM_KEYS[1]}]} -eq 1 ]]; then
+    if [[ ${!pod} -eq 1 ]]; then
         echo "Send pod terminating status to cloudify..." 1>&2
         close_connection
         echo "Terminating sent." 1>&2
     fi
+
+    trap - INT TERM KILL EXIT QUIT HUP
 
     exit $1
 }
@@ -202,7 +219,7 @@ function retrieve_and_check_parameters {
     done
 
     #Checking required parameters if enc=1
-    if [[ ${PARAMS[${PARAM_KEYS[0]}]} == 1 ]]; then
+    if [[ ${!enc} == 1 ]]; then
         for p in ${PARAM_REQUIRED_ENC[@]}; do
             if [[ ${PARAMS[$p]} == $PARAM_NOT_SET ]]; then
                 echo "Enc parameter set to 1 => Missing parameter $p" 1>&2
@@ -212,7 +229,7 @@ function retrieve_and_check_parameters {
     fi
 
     #Checking required parameters if pod=1
-    if [[ ${PARAMS[${PARAM_KEYS[1]}]} == 1 ]]; then
+    if [[ ${!pod} == 1 ]]; then
         for p in ${PARAM_REQUIRED_POD[@]}; do
             if [[ ${PARAMS[$p]} == $PARAM_NOT_SET ]]; then
                 echo "Pod parameter set to 1 => Missing parameter $p" 1>&2
@@ -237,9 +254,12 @@ function launch_pulseaudio_server {
     # state=2 ; enc=0,1 => loaded pulseaudio tcp module
 
     echo -n "Creating PulseAudio ssh tunnel..." 1>&2
-    ssh -o UserKnownHostsFile=/dev/null -i "${SSH_ID_RSA}/id_rsa" -oStrictHostKeyChecking=no -f -N \
+    ssh -4 -o UserKnownHostsFile=/dev/null \
+        -i "${SSH_ID_RSA}/id_rsa" \
+        -oStrictHostKeyChecking=no -f -N \
+        -M -S "${SSH_SOCKET}/ssh_socket:${!target_node_port_ssh}" \
         -R ${PULSE_PORT}:localhost:${PULSE_PORT} \
-        vncuser@${PARAMS[${PARAM_KEYS[6]}]} -p ${PARAMS[${PARAM_KEYS[7]}]} 1>&2
+        vncuser@${!target_node_ip} -p ${!target_node_port_ssh} 1>&2
     echo "OK" 1>&2
     ((state++))
     # state=3 ; enc=0,1 => ssh pulseaudio tunnel created
@@ -248,20 +268,22 @@ function launch_pulseaudio_server {
 #Function to launch vncviewer
 function launch_vncviewer {
     #Create ssh tunnel for the vnc protocol if enc=1
-    if [[ ${PARAMS[${PARAM_KEYS[0]}]} == 1 ]]; then
+    if [[ ${!enc} == 1 ]]; then
         echo "Creating ssh tunnel for the vnc protocol..." 1>&2
         ssh -4 -o UserKnownHostsFile=/dev/null \
-            -i "${SSH_ID_RSA}/id_rsa" -oStrictHostKeyChecking=no -f -N \
-            -L ${PARAMS[${PARAM_KEYS[8]}]}:localhost:${PARAMS[${PARAM_KEYS[8]}]} \
-            vncuser@${PARAMS[${PARAM_KEYS[6]}]} -p ${PARAMS[${PARAM_KEYS[7]}]} 1>&2
+            -i "${SSH_ID_RSA}/id_rsa" \
+            -oStrictHostKeyChecking=no -f -N \
+            -S "${SSH_SOCKET}/ssh_socket:${!target_node_port_ssh}" \
+            -L ${!enc_port}:localhost:${!enc_port} \
+            vncuser@${!target_node_ip} -p ${!target_node_port_ssh} 1>&2
         echo "Done."
         ((state++))
         # state=4 ; enc=1 => ssh vnc tunnel created
     fi
-    
+
     #Launch vncviewer
-    vncviewer -CompressLevel ${PARAMS[${PARAM_KEYS[2]}]} -QualityLevel ${PARAMS[${PARAM_KEYS[3]}]} \
-              ${PARAMS[${PARAM_KEYS[4]}]} -passwd <(echo ${PARAMS[${PARAM_KEYS[5]}]} | vncpasswd -f) 1>&2
+    vncviewer -CompressLevel ${!compression} -QualityLevel ${!quality} \
+              ${!target} -passwd <(echo ${!token} | vncpasswd -f) 1>&2
 }
 
 function main {
