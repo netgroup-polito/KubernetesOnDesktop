@@ -116,7 +116,13 @@ function run_native_vncviewver_novnc_application {
 	((state=state+1))
 	#state=2 ; enc=0,1 ; run_mode=0
 	echo -n "Creating PulseAudio ssh tunnel..."
-	ssh -o UserKnownHostsFile=/dev/null -i "${working_dir}/id_rsa" -oStrictHostKeyChecking=no -f -N -R ${pulsePort}:localhost:${pulsePort}  vncuser@${targetNodeIp} -p ${targetNodePortSsh} &>/dev/null
+	ssh -o UserKnownHostsFile=/dev/null \
+		-i "${working_dir}/id_rsa" \
+		-oStrictHostKeyChecking=no -f -N \
+		-M -S "${working_dir}/ssh_socket:${targetNodePortSsh}" \
+		-R ${pulsePort}:localhost:${pulsePort} \
+		vncuser@${targetNodeIp} \
+		-p ${targetNodePortSsh} 2>&1 #&>/dev/null
 	echo "OK"
 	((state=state+1))
 	#state=3 ; enc=0,1 ; run_mode=0
@@ -124,7 +130,13 @@ function run_native_vncviewver_novnc_application {
 	if [ $enc -eq 1 ]; then
 		#Creating ssh tunnel for the protocol
 		echo -n "Creating VNC ssh tunnel..."
-		ssh -o UserKnownHostsFile=/dev/null -i "${working_dir}/id_rsa" -oStrictHostKeyChecking=no -f -N -L ${port}:localhost:${port}  vncuser@${targetNodeIp} -p ${targetNodePortSsh} &>/dev/null
+		ssh -o UserKnownHostsFile=/dev/null \
+			-i "${working_dir}/id_rsa" \
+			-oStrictHostKeyChecking=no -f -N \
+			-S "${working_dir}/ssh_socket:${targetNodePortSsh}" \
+			-L ${port}:localhost:${port} \
+			vncuser@${targetNodeIp} \
+			-p ${targetNodePortSsh} 2>&1 #&>/dev/null
 		echo "OK"
 		((state=state+1))
 		#state=4 ; enc=1 ; run_mode=0
@@ -279,7 +291,7 @@ function adjust_and_apply_pod {
 	pod_finished_can_exit=0
 	while [ $pod_finished_can_exit -eq 0 ]; do
 		while read line; do
-			if [ "$line" == 'Close' ]; then
+			if [ "$line" == "Close_${token}" ]; then
 				pod_finished_can_exit=1
 				break
 			fi
@@ -397,7 +409,7 @@ function start_deploy {
 			if [ $? -ge 0 ]; then
 				echo "OK"
 				#Register Ctr+C interrupt
-				trap clear_and_exit INT TERM KILL EXIT QUIT HUP
+				trap 'clear_and_exit -1' INT TERM KILL EXIT QUIT HUP
 					
 				#Generating ssh key pair
 				echo -n "Generating ssh key pair..."
@@ -446,12 +458,22 @@ function start_deploy {
 
 #Delete only the deployment NOT the volume
 function clear_and_exit {
-	trap - INT TERM KILL EXIT QUIT HUP
+	#Check if an error occurred and run application locally. If $1 is 0 => no errors occurred
+	if [ $1 -ne 0 ]; then
+		if [ $1 -lt 0 ]; then
+			#If $1 is less than 0 it means that a signal has been caught
+			echo "Process interrupted with signal. Cleaning up and exiting..."
+		else
+			#If $1 is more than 0 it means that an error occured
+			echo "Running ${application_name} locally"
+			${application_name} &>/dev/null &
+		fi
+	fi
 
 	if [ $state -ge 3 ]; then
 		#Stop ssh VNC and/or PulseAudio tunnel
 		echo -n "Stopping SSH VNC and/or PulseAudio tunnel..."
-		pkill ssh &>/dev/null
+		ssh -S "${working_dir}/ssh_socket:${targetNodePortSsh}" -O "exit" vncuser@${targetNodeIp} &>/dev/null
 		echo "OK"
 	fi
 
@@ -483,13 +505,10 @@ function clear_and_exit {
 		echo "OK"
 	fi
 
-	#Check if an error occurred and run application locally
-	if [ $1 -ne 0 ]; then
-		echo "Running ${application_name} locally"
-	else
-		echo "Process completed"
-	fi
+	echo "Process completed"
 	
+	trap - INT TERM KILL EXIT QUIT HUP
+
 	exit $1
 }
 

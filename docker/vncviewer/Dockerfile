@@ -60,7 +60,7 @@
 
 FROM ubuntu:focal
 LABEL maintainer="Riccardo Roccaro <r0ccard0@gmail.com>"
-ENV REFRESHED_AT 2020-07-18 
+ENV REFRESHED_AT 2020-07-26 
 SHELL ["/bin/bash", "-c"]
 
 # VARIABLES
@@ -68,20 +68,15 @@ ENV USER=vnc \
     ROOT_PATH=/ \
     PULSE_PORT=34567
 
-# EXPOSING PORTS
-#EXPOSE ${PULSE_PORT}
-
 #===============================================#
 # Install audio, video and general dependencies #
 #===============================================#
 RUN apt-get update
 RUN DEBIAN_FRONTEND=noninteractive apt-get install -y \
-    sudo \
     wget \
     ssh \
     netcat \
     pulseaudio \
-    alsa-utils \
     libgl1-mesa-dri \
     libgl1-mesa-glx
 
@@ -97,13 +92,13 @@ ENV HOME /home/${USER}
 RUN echo ${HOME} && echo ${USER}
 RUN useradd -d ${HOME} -m ${USER} && \
     passwd -d ${USER} && \
-    adduser ${USER} sudo && \
     usermod -aG audio ${USER}
 
 #==========#
 # Clean up #
 #==========#
-RUN apt-get --purge autoremove -y && \
+RUN apt-get purge wget -y && \
+    apt-get --purge autoremove -y && \
     apt-get autoclean -y && \
     rm /etc/apt/sources.list && \
     rm -rf /var/cache/apt/archives/* && \
@@ -124,9 +119,12 @@ USER ${USER}
 # STORAGE SELECTION
 WORKDIR ${HOME}
 
-# CREATING SSH IDENTITY DIRECTORY
-RUN mkdir ssh_id_rsa
+# CREATING SSH IDENTITY AND SOCKET DIRECTORIES
+RUN mkdir ${HOME}/ssh_id_rsa
 ENV SSH_ID_RSA=${HOME}/ssh_id_rsa
+RUN mkdir ${HOME}/ssh_socket
+ENV SSH_SOCKET=${HOME}/ssh_socket
+
 
 # SETTING ENTRYPOINT
 ENTRYPOINT [ "./run_vncviewer.sh" ]
