@@ -45,8 +45,7 @@ RUN apt-get update && \
                     x11-xkb-utils \
                     net-tools \
                     pulseaudio \
-                    python-numpy \
-                    $APPLICATION && \
+                    python-numpy &&\
     apt -y autoclean
 
 ### Installing TigerVNC
