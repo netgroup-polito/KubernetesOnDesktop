@@ -122,7 +122,7 @@ function run_native_vncviewver_novnc_application {
 		-M -S "${working_dir}/ssh_socket:${targetNodePortSsh}" \
 		-R ${pulsePort}:localhost:${pulsePort} \
 		vncuser@${targetNodeIp} \
-		-p ${targetNodePortSsh} 2>&1 #&>/dev/null
+		-p ${targetNodePortSsh} &>/dev/null
 	echo "OK"
 	((state=state+1))
 	#state=3 ; enc=0,1 ; run_mode=0
@@ -136,7 +136,7 @@ function run_native_vncviewver_novnc_application {
 			-S "${working_dir}/ssh_socket:${targetNodePortSsh}" \
 			-L ${port}:localhost:${port} \
 			vncuser@${targetNodeIp} \
-			-p ${targetNodePortSsh} 2>&1 #&>/dev/null
+			-p ${targetNodePortSsh} &>/dev/null
 		echo "OK"
 		((state=state+1))
 		#state=4 ; enc=1 ; run_mode=0
