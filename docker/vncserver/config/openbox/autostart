@@ -1,3 +1,0 @@
-tint2 -c /etc/xdg/tint2/tint2rc &
-
-x11vnc -display $DISPLAY -once -passwd $VNC_PASSWORD -xrandr newfbsize &
