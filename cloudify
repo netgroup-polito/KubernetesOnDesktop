@@ -32,11 +32,11 @@ supported_run_modes=("0 (native app)" "1 (docker container)" "2 (k8s pod)")
 default_run_mode=0
 run_mode=$default_run_mode
 #TigerVNC viewer docker's name and version
-tigervnc_docker="r0ccard0/tigervnc:v1"
+tigervnc_docker="riccardoroccaro/vncviewer:stable"
 tigervnc_dockerfile_path="$folder/docker/vncviewer"
-tigervnc_container_name="r0ccard0-tigervnc"
+tigervnc_container_name="riccardoroccaro-vncviewer"
 #TigerVNC viewer pod app name
-tigervnc_pod_app_name="r0ccard0-tigervnc"
+tigervnc_pod_app_name="riccardoroccaro-vncviewer"
 
 #Set SECURE_CONNECTION to 1/0 depending on encryption
 function adjust_encription {
@@ -175,11 +175,10 @@ function create_container_and_launch_vncviewer {
 	docker run -d --name $tigervnc_container_name \
 		-v ${working_dir}:/home/vnc/ssh_id_rsa \
 		-v /tmp/.X11-unix/:/tmp/.X11-unix/ \
-		-v /dev/snd:/dev/snd \
+		--device /dev/snd:/dev/snd \
 		-v /dev/shm:/dev/shm \
 		-v /var/run/dbus:/var/run/dbus \
 		-e DISPLAY \
-		--privileged \
 		$tigervnc_docker \
 		enc=$1 `#enc` \
 		pod=0 `#pod` \
