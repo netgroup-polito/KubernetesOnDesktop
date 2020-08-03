@@ -3,18 +3,18 @@
 #============================#
 # *** Build tigervnc docker ***
 #
-# docker build -t r0ccard0/tigervnc:v1 .
+# docker build -t riccardoroccaro/vncviewer:v1 .
 #
 # *** Run vncviewer in a container ***
 #
-# docker run --name r0ccard0-tigervnc \
+# docker run --name riccardoroccaro-vncviewer \
 #     -v ${working_dir}:/home/vnc/ssh_id_rsa \
 #     -v /tmp/.X11-unix/:/tmp/.X11-unix/ \
 #     --device /dev/snd \
 #     -v /dev/shm:/dev/shm \
 #     -v /var/run/dbus:/var/run/dbus \
 #     -e DISPLAY \
-#     r0ccard0/tigervnc:v1 \
+#     riccardoroccaro/vncviewer:v1 \
 #     enc=<enc> `#enc [1|0]` \
 #     pod=<pod> `#pod [1|0]` \
 #     compression=<CompressLevel> `#comression [0-6]` \
@@ -54,12 +54,12 @@
 # `--device /dev/snd`
 # with:
 # `-v /dev/snd:/dev/snd`
-# and adding before the image name (r0ccard0/tigervnc:v1) line the following:
+# and adding before the image name (riccardoroccaro/vncviewer:v1) line the following:
 # `--privileged`
 #
 
 FROM ubuntu:focal
-LABEL maintainer="Riccardo Roccaro <r0ccard0@gmail.com>"
+LABEL maintainer="Riccardo Roccaro <riccardoroccaro@gmail.com>"
 ENV REFRESHED_AT 2020-07-26 
 SHELL ["/bin/bash", "-c"]
 

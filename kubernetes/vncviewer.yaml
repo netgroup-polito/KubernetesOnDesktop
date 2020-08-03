@@ -1,14 +1,14 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: r0ccard0-tigervnc
+  name: riccardoroccaro-vncviewer
   labels:
-    app: r0ccard0-tigervnc
+    app: riccardoroccaro-vncviewer
 spec:
   template:
     metadata:
       labels:
-        app: r0ccard0-tigervnc
+        app: riccardoroccaro-vncviewer
     spec:
       nodeName: RAR_001_K8S_NODE_NAME # schedule pod to specific node. Replace value with appropriate nodeName
       containers:
