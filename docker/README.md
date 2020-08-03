@@ -3,7 +3,7 @@
 In this section there are the official docker images, supporting also the audio feature, used to manage both the vnc server side, wich also run the required application (e.g. Firefox), and the vnc client side that shows the server app GUI. This main section it's splitted in two more sections called "vncserver" and "vncviewer".
 
  The "vncserver" section,
- contains the image that has been built with both VNC and noVNC protocols and it supports the following applications:
+ contains a base image with all the required audio/video streaming packages and a second image template (created `from:` the first one) that has been built with both VNC and noVNC protocols and that supports the following applications:
 
 * Firefox
 * Libreoffice
