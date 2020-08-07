@@ -1,14 +1,14 @@
 # Kubernetes On Desktop
 
-Project duration: 10 person weeks
-
-Developed by: **Simone Magnani**
+Developed by: **Simone Magnani** - **Antonio Riccardo Roccaro**
 
 Tutor: **Fulvio Risso** - **Alex Palesandro**
 
 Version: 1.0
 
-Presentation slides: [KubernetesOnDesktop](https://docs.google.com/presentation/d/15Dj8vwPaAyB_QmC_4886_E1K4pc7DzzlEPeiWJJMcCI/edit#slide=id.g742e3e7cd_1_16)
+Presentation slides: 
+* [KubernetesOnDesktop - Magnani](https://docs.google.com/presentation/d/15Dj8vwPaAyB_QmC_4886_E1K4pc7DzzlEPeiWJJMcCI/edit#slide=id.g742e3e7cd_1_16)
+* [KubernetesOnDesktop - Roccaro](https://docs.google.com/presentation/d/1wgvFvCxXwwiVH2EqXjM8Idhhes_Zjr_Ciq4St1TMbKE/edit?usp=sharing)
 
 ## Description
 
@@ -30,7 +30,7 @@ Everything is tunable user-side like connection quality, program executed, compr
 * NoVNC
 * SSH server
 * Openbox (light window manager)
-* Some utility tools (wget, net-tools, locales, xdotool, python-numpy used for websockify/novnc)
+* Some utility tools (wget, net-tools, locales, xdotool, python-numpy used for websockify/novnc, xorg)
 * Firefox/Libreoffice (once per docker image)
 
 These not only allows our infrastructure to be reachable both via a VNC client and browser, but they also ensure that everything fits user needs and tastes.
@@ -38,15 +38,18 @@ These not only allows our infrastructure to be reachable both via a VNC client a
 ## Dependencies
 
 * Kubectl
-* VNC viewer (vncviewer command must exist)
+* VNC viewer
 * vncpasswd (present in any vnc server package)
 * Netcat
+
+VNC viewer is required only in native mode execution. In the other cases (docker or k8s pod) it is already integrated inside the docker image.
 
 While Kubectl is mandatory, Netcat and VNC viewer can be replaced by other application modifying the script. However, make sure that the ones you want to use are compatible with all the parameters (quality, compression), otherwise you may not achieve the same result.
 
 **Note**
 
-Due to the usage of `vncpasswd` command to automatically encrypt the password from the command line, also the vncserver dependency should be installed. There are no current `vncpasswd` standalone installation.
+Due to the usage of `vncpasswd` command to automatically encrypt the password from the command line, also the vncserver dependency should be installed
+while using native run mode. There are no current `vncpasswd` standalone installation.
 
 ## Supported Applications
 
@@ -72,7 +75,12 @@ The second step is to modify the deployment file according to the user preferenc
 
 Once gathered pod's information, the program waits for the pod to change it's state to RUNNING, meaning that it's ready to be contacted. Of course every phase has its own controls to be sure that the following step executes only if all the previous succeeded. In this phase the public RSA key is copied to the specific pod and it is started the local PulseAudio TCP server. The user is now ready to connect.
 
-The connection phase starts with a mandatory remote port forwarding for the audio and an optional local port forwarding for the encrypted VNC/noVNC connection, depending whether the encryption has been previously enable or not. If these command succeed, the connection starts using the right client (vncviewer or a browser).
+The connection can be done in three different execution modes:
+1 - Native mode (by running cloudify with -r 0 option), that use the standalone vncviewer installation inside the local machine;
+2 - Docker mode (by running cloudify with -r 1 option), that use a docker image containing the vncviewer installation and all the other required packages;
+3 - K8s pod mode (by running cloudify with -r 2 option), that use the same docker image but its scheduling is done by k8s on the local machine that must a node of the k8s cluster.
+
+In every cases, the connection phase starts with a mandatory remote port forwarding for the audio and an optional local port forwarding for the encrypted VNC/noVNC connection, depending whether the encryption has been previously enable or not. If these command succeed, the connection starts using the right client (vncviewer or a browser).
 
 A huge difference between the two client is that if a vncviewer is used, the user has still the possibility to change at run time some parameter to tune the connection quality as he wants, while if it using noVNC this is not allowed.
 
@@ -101,16 +109,23 @@ Actually there are a lot of optional parameter as reported in the script usage:
 
 ```bash
 Run application in Cloud using Kubernetes as orchestrator.
-Usage: ./cloudify [-h] [-e] [-t timeout] [-p protocol] [-q quality] [-c compression] app_name
+Usage: ./cloudify [-h] [-e] [-t timeout] [-p protocol] [-q quality] [-c compression] [-r runmode] app_name
 |-> -h: start the helper menu
 |-> -e: specify that the connection must be encrypted (0/1, default 0 disabled)
 |-> -t: connection/wait timeout in seconds (positive number, default 60)
 |-> -p: connection protocol to be used (vnc/novnc, default vnc)
-|-> -q: specify the quality of the connection (0-9, default 4)
-|-> -c: specify the compression of the connection (0-6, default 3)
+|-> -q: specify the quality of the connection (0-9, default 5)
+|-> -c: specify the compression of the connection (0-6, default 2)
+|-> -r: vncviewer run mode:
+|       0-> native app
+|       1-> docker container
+|       2-> k8s pod
+|       default-> 0 (native app).
+|       Warning: this option can't be used if '-p novnc' is set
 |
 |->Example: ./cloudify firefox
 |->Example: ./cloudify -q 7 -t 10 -e firefox
+|->Example: ./cloudify -q 7 -t 10 -e -r 1 firefox
 ```
 
 If everything was correct, a vncviewer window rendering the application will appear. Interestingly, you now not only can play the remote audio, but also controlling it. 

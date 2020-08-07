@@ -24,7 +24,7 @@ spec:
           claimName: XXXXXXXXXX-pv-claim
       containers:
       - name: XXXXXXXXXX-kubernetes
-        image: s41m0n/XXXXXXXXXX-headless-vnc
+        image: riccardoroccaro/XXXXXXXXXX-headless-vnc:stable
         imagePullPolicy: IfNotPresent
         env:
         #Local pod pulse server

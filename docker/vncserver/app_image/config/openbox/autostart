@@ -1,0 +1,1 @@
+x11vnc -display $DISPLAY -once -passwd $VNC_PASSWORD -xrandr newfbsize &
