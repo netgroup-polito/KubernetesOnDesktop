@@ -19,9 +19,9 @@ spec:
         emptyDir:
           medium: Memory
       #User home directory
-      - name: XXXXXXXXXX-persistent-storage
-        persistentVolumeClaim:
-          claimName: XXXXXXXXXX-pv-claim
+#      - name: XXXXXXXXXX-persistent-storage
+#        persistentVolumeClaim:
+#          claimName: XXXXXXXXXX-pv-claim
       containers:
       - name: XXXXXXXXXX-kubernetes
         image: riccardoroccaro/XXXXXXXXXX-headless-vnc:stable
@@ -58,7 +58,7 @@ spec:
         #Set max memory to avoid consumes and ensure minimum resources
         resources:
           limits:
-            memory: "4000Mi"
+            memory: "2048Mi"
       terminationGracePeriodSeconds: 0
 ---
 #Service config

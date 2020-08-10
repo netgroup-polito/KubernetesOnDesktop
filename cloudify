@@ -25,6 +25,8 @@ pulsePort=34567
 #List of supported apps
 supported_apps=("firefox" "libreoffice")
 supported_protocols=("vnc" "novnc")
+#Variable to select whether to use pvc or not
+use_pvc=0
 #The vncviewer pod file
 tigervncPodFile="$folder/kubernetes/vncviewer.yaml"
 #vncviewer run mode (0-> native app, 1-> docker container, 2-> k8s pod)
@@ -60,9 +62,12 @@ function adjust_token {
 }
 
 function adjust_volumes {
+	from=`grep -n "XXXXXXXXXX-persistent-storage" ${targetDeploy} | cut -d : -f -1`
+	((to=from+2))
+	sed -i "${from},${to} {s/^#//g}" ${targetDeploy}
+
 	from=`grep -n "${application_name}-persistent-storage" ${targetDeploy} | cut -d : -f -1`
 	((to=from+1))
-	
 	sed -i "${from},${to} {s/^#//g}" ${targetDeploy}
 }
 
@@ -225,17 +230,17 @@ function adjust_and_apply_pod {
 	done
 	IFS=$old_IFS
 
-	#Check that currente node name != "" and exists in the cluster
-	if [[ $current_node_name == "" ]] || [[ $(kubectl get node | grep $current_node_name) == "" ]]; then
-		echo "Error: Wrong node name. '$current_node_name' is not a cluster node name."
-		clear_and_exit 4
-	fi
+	# #Check that currente node name != "" and exists in the cluster
+	# if [[ $current_node_name == "" ]] || [[ $(kubectl get node | grep $current_node_name) == "" ]]; then
+	# 	echo "Error: Wrong node name. '$current_node_name' is not a cluster node name."
+	# 	clear_and_exit 4
+	# fi
 
-	#Check that internalIP has xxx.xxx.xxx.xxx template and corresponds to the one bound to the current node name
-	if [[ $current_node_address != $(grep -oE '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}' <<< $(kubectl get node -o wide | grep "rar-k8s-client-01")) ]]; then
-		echo "Error: Wrong node IP address."
-		clear_and_exit 5
-	fi
+	# #Check that internalIP has xxx.xxx.xxx.xxx template and corresponds to the one bound to the current node name
+	# if [[ $current_node_address != $(grep -oE '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}' <<< $(kubectl get node -o wide | grep "rar-k8s-client-01")) ]]; then
+	# 	echo "Error: Wrong node IP address."
+	# 	clear_and_exit 5
+	# fi
 
 	#Get a free tcp port to listen to
 	while true; do
@@ -369,7 +374,11 @@ function start_deploy {
 	cp ${targetDeploy} "${working_dir}/deployment.yaml"
 	targetDeploy="${working_dir}/deployment.yaml"
 	
-	adjust_volumes
+	#Check if pvc is enabled and adjust the volumes in the yaml file
+	if [ $use_pvc -eq 1 ]; then
+		adjust_volumes
+	fi
+
 	adjust_encription
 	adjust_appname
 	adjust_protocol
@@ -394,7 +403,7 @@ function start_deploy {
 			echo -n "Applying deploy..."
 			#Start both deploy and volume
 
-			#Apply both the pvc and the deploy and increment state variable at the end. This way:
+			#Apply both the pvc (if use_pvc=1) and the deploy and increment state variable at the end. This way:
 			# 1- If there's a 'Ctrl+C' between the two apply we don't run the risk of don't clear the resources already allocated due to the fact that
 			#    the state was not incremented yet (if state++ would be done afterwards);
 			# 2- We don't run the risk of a wrong exit status check afterwards due to the fact that if the state is incremented after the apply 
@@ -403,7 +412,11 @@ function start_deploy {
 			# N.B.: It works because:
 			# a- if the second apply fails the state increment will not be done and the resources will not be allocated
 			# b- we don't care about the first apply because the pvc will never be deleted
-			kubectl apply -f $pvcDeploy &>/dev/null && kubectl apply -f $targetDeploy &>/dev/null && ((state++))
+			if [ $use_pvc -eq 1 ]; then
+				kubectl apply -f $pvcDeploy &>/dev/null && kubectl apply -f $targetDeploy &>/dev/null && ((state++))
+			else
+				kubectl apply -f $targetDeploy &>/dev/null && ((state++))
+			fi
 			#state=1 ; enc=0,1 ; run_mode=0,1,2
 			if [ $? -ge 0 ]; then
 				echo "OK"
@@ -521,6 +534,7 @@ function print_usage_and_exit {
 	echo "|-> -p: connection protocol to be used (vnc/novnc, default $protocol)"
 	echo "|-> -q: specify the quality of the connection (0-9, default $quality)"
 	echo "|-> -c: specify the compression of the connection (0-6, default $compression)"
+	echo "|-> -v: specify whether to use the pvc or not (0-no/1-yes, default $use_pvc)"
 	echo "|-> -r: vncviewer run mode:" 
 	echo "|       0-> native app"
 	echo "|       1-> docker container" 
@@ -550,7 +564,7 @@ function main() {
 		print_usage_and_exit 1
 	fi
 
-	while getopts "hec:q:t:p:r:" opt; do
+	while getopts "hec:q:t:p:v:r:" opt; do
 		case $opt in
 			e)
 				enc=1
@@ -586,6 +600,13 @@ function main() {
 				fi
 				protocol="$OPTARG"
 				echo "Parameter PROTOCOL...OK $OPTARG"
+				;;
+			v) 
+				if [[ ! "$OPTARG" =~ ^[0-1]$ ]]; then
+					print_usage_and_exit 1
+				fi
+				use_pvc=$OPTARG
+				echo "Parameter USE PVC...OK ${use_pvc}"
 				;;
 			r)
 				if [[ ! "$OPTARG" =~ ^[0-2]$ ]]; then

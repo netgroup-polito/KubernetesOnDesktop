@@ -59,7 +59,7 @@
 #
 
 FROM ubuntu:focal
-LABEL maintainer="Riccardo Roccaro <riccardoroccaro@gmail.com>"
+LABEL maintainer="Riccardo Roccaro <r0cc4rd0@gmail.com>"
 ENV REFRESHED_AT 2020-07-26 
 SHELL ["/bin/bash", "-c"]
 

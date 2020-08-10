@@ -10,7 +10,7 @@
 #
 
 FROM ubuntu:18.04
-LABEL maintainer="Riccardo Roccaro <riccardoroccaro@gmail.com>"
+LABEL maintainer="Riccardo Roccaro <r0cc4rd0@gmail.com>"
 ENV REFRESHED_AT 2020-07-30
 
 LABEL io.k8s.description="Headless VNC Container with Xfce window manager and many applications" \
