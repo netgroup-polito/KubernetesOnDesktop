@@ -46,5 +46,9 @@ RUN rm -rf /etc/xdg/openbox && \
     cp -R openbox /etc/xdg/openbox && \
     mv /etc/xdg/openbox/${APPLICATION}.xml /etc/xdg/openbox/rc.xml
 
+### Creating ssh_secret dir inside user's home to mount the secret
+RUN mkdir ${HOME}/ssh_secret && \
+    chmod 775 ${HOME}/ssh_secret
+
 ### Setting entrypoint
 ENTRYPOINT [ "/opt/config/docker-entrypoint.sh" ] 

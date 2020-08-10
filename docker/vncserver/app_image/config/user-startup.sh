@@ -1,8 +1,6 @@
 #!/bin/bash -xe
 set -e
 
-mkdir $HOME/.ssh
-
 ## change vnc password
 # first entry is control, second is view (if only one is valid for both)
 mkdir -p "$HOME/.vnc"

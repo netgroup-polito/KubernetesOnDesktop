@@ -27,6 +27,8 @@ supported_apps=("firefox" "libreoffice")
 supported_protocols=("vnc" "novnc")
 #Variable to select whether to use pvc or not
 use_pvc=0
+#Variable containing the ssh secret name
+ssh_secret_name="rar-ssh-secret"
 #The vncviewer pod file
 tigervncPodFile="$folder/kubernetes/vncviewer.yaml"
 #vncviewer run mode (0-> native app, 1-> docker container, 2-> k8s pod)
@@ -119,7 +121,7 @@ function run_native_vncviewver_novnc_application {
 	pactl load-module module-native-protocol-tcp port=${pulsePort} auth-ip-acl=127.0.0.1 &>/dev/null
 	echo "OK"
 	((state=state+1))
-	#state=2 ; enc=0,1 ; run_mode=0
+	#state=3 ; enc=0,1 ; run_mode=0
 	echo -n "Creating PulseAudio ssh tunnel..."
 	ssh -o UserKnownHostsFile=/dev/null \
 		-i "${working_dir}/id_rsa" \
@@ -130,7 +132,7 @@ function run_native_vncviewver_novnc_application {
 		-p ${targetNodePortSsh} &>/dev/null
 	echo "OK"
 	((state=state+1))
-	#state=3 ; enc=0,1 ; run_mode=0
+	#state=4 ; enc=0,1 ; run_mode=0
 
 	if [ $enc -eq 1 ]; then
 		#Creating ssh tunnel for the protocol
@@ -144,7 +146,7 @@ function run_native_vncviewver_novnc_application {
 			-p ${targetNodePortSsh} &>/dev/null
 		echo "OK"
 		((state=state+1))
-		#state=4 ; enc=1 ; run_mode=0
+		#state=5 ; enc=1 ; run_mode=0
 	fi
 
 	#Check the protocol and run the corresponding native app
@@ -203,7 +205,7 @@ function create_container_and_launch_vncviewer {
 	fi
 
 	((state=state+1))
-	#state=2 ; enc=0,1 ; run_mode=1
+	#state=3 ; enc=0,1 ; run_mode=1
 
 	#Wait for the docker to complete its execution
 	echo "Wait for the docker to complete its execution..."
@@ -276,7 +278,7 @@ function adjust_and_apply_pod {
 
 	#Applying the pod to the current node and wait for the process completion
 	kubectl apply -f $tigervncPodFile &>/dev/null && ((state++))
-	#state=2 ; enc=0,1 ; run_mode=2
+	#state=3 ; enc=0,1 ; run_mode=2
 
 	#Waiting for the pod to start
 	echo -n "Waiting for vncviewer pod to start, max ${timeout} seconds..."
@@ -400,64 +402,70 @@ function start_deploy {
 
 			adjust_token
 
-			echo -n "Applying deploy..."
-			#Start both deploy and volume
+			#Generating ssh key pair
+			echo -n "Generating ssh key pair..."
+			ssh-keygen -t rsa -b 4096 -C "${USER}@kubernetes.io" -f "${working_dir}/id_rsa" -N "" &>/dev/null
+			echo "OK"
 
-			#Apply both the pvc (if use_pvc=1) and the deploy and increment state variable at the end. This way:
-			# 1- If there's a 'Ctrl+C' between the two apply we don't run the risk of don't clear the resources already allocated due to the fact that
-			#    the state was not incremented yet (if state++ would be done afterwards);
-			# 2- We don't run the risk of a wrong exit status check afterwards due to the fact that if the state is incremented after the apply 
-			#	 (even if it fails) the $? variable is 0 because ((state++)) doesn't fail;
-			# 3- We don't run the risk of clear resources non allocated yet by increment the state before the apply.
-			# N.B.: It works because:
-			# a- if the second apply fails the state increment will not be done and the resources will not be allocated
-			# b- we don't care about the first apply because the pvc will never be deleted
-			if [ $use_pvc -eq 1 ]; then
-				kubectl apply -f $pvcDeploy &>/dev/null && kubectl apply -f $targetDeploy &>/dev/null && ((state++))
-			else
-				kubectl apply -f $targetDeploy &>/dev/null && ((state++))
-			fi
+			#Register Ctr+C interrupt
+			trap 'clear_and_exit -1' INT TERM KILL EXIT QUIT HUP
+
+			echo -n "Creating ssh secret..."
+			kubectl create secret generic $ssh_secret_name --from-file=authorized_keys="${working_dir}/id_rsa.pub" &>/dev/null && ((state++))
 			#state=1 ; enc=0,1 ; run_mode=0,1,2
-			if [ $? -ge 0 ]; then
-				echo "OK"
-				#Register Ctr+C interrupt
-				trap 'clear_and_exit -1' INT TERM KILL EXIT QUIT HUP
-					
-				#Generating ssh key pair
-				echo -n "Generating ssh key pair..."
-				ssh-keygen -t rsa -b 4096 -C "${USER}@kubernetes.io" -f "${working_dir}/id_rsa" -N "" &>/dev/null
+
+			if [ $state -gt 0 ]; then
 				echo "OK"
 
-				#Waiting for the pod to start
-				echo -n "Waiting for pod to start, max ${timeout}seconds..."
-				kubectl wait --for=condition=Ready pod -l "app=${application_name}" --timeout=${timeout}s &>/dev/null
-	
-				if [ $? -eq 0 ]; then
-					echo "OK pod running"
+				echo -n "Applying deploy..."
+				#Apply both the pvc (if use_pvc=1) and the deploy and increment state variable at the end. This way:
+				# 1- If there's a 'Ctrl+C' between the two apply we don't run the risk of don't clear the resources already allocated due to the fact that
+				#    the state was not incremented yet (if state++ would be done afterwards);
+				# 2- We don't run the risk of a wrong exit status check afterwards due to the fact that if the state is incremented after the apply 
+				#	 (even if it fails) the $? variable is 0 because ((state++)) doesn't fail;
+				# 3- We don't run the risk of clear resources non allocated yet by increment the state before the apply.
+				# N.B.: It works because:
+				# a- if the second apply fails the state increment will not be done and the resources will not be allocated
+				# b- we don't care about the first apply because the pvc will never be deleted
+				if [ $use_pvc -eq 1 ]; then
+					kubectl apply -f $pvcDeploy &>/dev/null && kubectl apply -f $targetDeploy &>/dev/null && ((state++))
+				else
+					kubectl apply -f $targetDeploy &>/dev/null && ((state++))
+				fi
+				#state=2 ; enc=0,1 ; run_mode=0,1,2
 
-					echo -n "Retrieving node IP and PORT..."
-					retrieve_pod_info
-					echo "OK ip -> ${targetNodeIp}, $protocol -> ${targetNodePortProtocol}, ssh -> ${targetNodePortSsh}, podName -> ${targetPodName}, podNs -> ${targetPodNamespace}"
-					
-					echo -n "Deploying public key to pod..."
-					kubectl cp "${working_dir}/id_rsa.pub" ${targetPodNamespace}/${targetPodName}:/home/vncuser/.ssh/authorized_keys
+				if [ $? -ge 0 ]; then
 					echo "OK"
 
-					echo -n "Waiting for the NodePort to be opened..."
-					scan_node_port
-
+					#Waiting for the pod to start
+					echo -n "Waiting for pod to start, max ${timeout}seconds..."
+					kubectl wait --for=condition=Ready pod -l "app=${application_name}" --timeout=${timeout}s &>/dev/null
+		
 					if [ $? -eq 0 ]; then
-						echo "OK port opened"
-						connect
-						return
+						echo "OK pod running"
+
+						echo -n "Retrieving node IP and PORT..."
+						retrieve_pod_info
+						echo "OK ip -> ${targetNodeIp}, $protocol -> ${targetNodePortProtocol}, ssh -> ${targetNodePortSsh}, podName -> ${targetPodName}, podNs -> ${targetPodNamespace}"
+
+						echo -n "Waiting for the NodePort to be opened..."
+						scan_node_port
+
+						if [ $? -eq 0 ]; then
+							echo "OK port opened"
+							connect
+							return
+						else
+							echo "ERROR Nodeport took too much to be opened, running ${application_name} locally"
+						fi
 					else
-						echo "ERROR Nodeport took too much to be opened, running ${application_name} locally"
+						echo "ERROR cannot create pod, running ${application_name} locally"
 					fi
 				else
-					echo "ERROR cannot create pod, running ${application_name} locally"
+					echo "ERROR cannot apply deployment, running ${application_name} locally"
 				fi
 			else
-				echo "ERROR cannot apply deployment, running ${application_name} locally"
+				echo "ERROR cannot create secret, running ${application_name} locally"
 			fi
 		else
 			echo "ERROR cluster answered in ${nettime} seconds (too slow), running ${application_name} locally"
@@ -482,38 +490,45 @@ function clear_and_exit {
 		fi
 	fi
 
-	if [ $state -ge 3 ]; then
+	if [ $state -ge 4 ]; then
 		#Stop ssh VNC and/or PulseAudio tunnel
 		echo -n "Stopping SSH VNC and/or PulseAudio tunnel..."
 		ssh -S "${working_dir}/ssh_socket:${targetNodePortSsh}" -O "exit" vncuser@${targetNodeIp} &>/dev/null
 		echo "OK"
 	fi
 
-	if [ $state -ge 2 ] && [ $run_mode -eq 2 ]; then
+	if [ $state -ge 3 ] && [ $run_mode -eq 2 ]; then
 		#Deleteing the pod that was executing vncviewer
 		echo -n "Deleting the vncviewer pod..."
 		kubectl delete -f $tigervncPodFile &>/dev/null
 		echo "OK"
 	fi
 
-	if [ $state -ge 2 ] && [ $run_mode -eq 1 ]; then
+	if [ $state -ge 3 ] && [ $run_mode -eq 1 ]; then
 		#Deleting the container that was executing vncviewer
 		echo -n "Deleting the vncviewer container..."
 		docker container rm -f $tigervnc_container_name &>/dev/null
 		echo "OK"
 	fi
 
-	if [ $state -ge 2 ] && [ $run_mode -eq 0 ]; then
+	if [ $state -ge 3 ] && [ $run_mode -eq 0 ]; then
 		#Unloading PulseAudio TCP module
 		echo -n "Unloading PulseAudio TCP module..."
 		pactl unload-module module-native-protocol-tcp &>/dev/null
 		echo "OK"
 	fi
 
-	if [ $state -ge 1 ]; then
+	if [ $state -ge 2 ]; then
 		#Deleting deploy on cluster
 		echo -n "Deleting deploy on cluster..."
 		kubectl delete -f $targetDeploy &>/dev/null
+		echo "OK"
+	fi
+
+	if [ $state -ge 1 ]; then
+		#Deleting ssh secret on cluster
+		echo -n "Deleting ssh secret on cluster..."
+		kubectl delete secret $ssh_secret_name &>/dev/null
 		echo "OK"
 	fi
 

@@ -18,6 +18,10 @@ spec:
       - name: dshm
         emptyDir:
           medium: Memory
+      #Secret containing the ssh public key
+      - name: ssh-secret
+        secret:
+          secretName: rar-ssh-secret
       #User home directory
 #      - name: XXXXXXXXXX-persistent-storage
 #        persistentVolumeClaim:
@@ -49,6 +53,10 @@ spec:
         volumeMounts:
           - name: dshm
             mountPath: /dev/shm
+          #Mounting the secret containing the ssh public key
+          - name: ssh-secret
+            mountPath: /home/vncuser/ssh_secret
+            readOnly: true
           #Firefox PVC claim
 #          - name: firefox-persistent-storage
 #            mountPath: /home/vncuser/.mozilla

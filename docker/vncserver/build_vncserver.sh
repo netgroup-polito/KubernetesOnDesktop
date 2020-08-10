@@ -19,7 +19,7 @@ ESC_DST_LINE_3=$(printf '%s\n' "$DST_LINE_3" | sed -e 's/[\/&]/\\&/g')
 TEMPLATE='./app_image/Dockerfile.template'
 DOCKERFILE='./app_image/Dockerfile'
 
-V="v1.0"
+V="v2.0"
 
 function on_sigint {
 	#Removing the dockerfile leaving the template
