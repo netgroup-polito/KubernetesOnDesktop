@@ -13,6 +13,13 @@ spec:
       labels:
         app: XXXXXXXXXX
     spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                - key: k8s-on-desktop/vncviewer
+                  operator: DoesNotExist
       volumes:
       #Shared memory volume, to avoid crashes
       - name: dshm
@@ -66,7 +73,7 @@ spec:
         #Set max memory to avoid consumes and ensure minimum resources
         resources:
           limits:
-            memory: "2048Mi"
+            memory: "1024Mi"
       terminationGracePeriodSeconds: 0
 ---
 #Service config

@@ -6,12 +6,12 @@
 #
 # *** Build the docker ***
 #
-# docker build -t riccardoroccaro/<app_name>-headless-vnc:v1.0 .
+# docker build --build-arg APPLICATION=<app_name> -t riccardoroccaro/<app_name>-headless-vnc:stable .
 #
 
 FROM riccardoroccaro/base-headless-vnc:stable
 LABEL maintainer="Riccardo Roccaro <r0cc4rd0@gmail.com>"
-ENV REFRESHED_AT 2020-07-30
+ENV REFRESHED_AT 2020-08-20
 
 ### Application we want to install (passed as argument from build.sh)
 ARG APPLICATION=unknown
@@ -22,13 +22,9 @@ ENV APPLICATION=$APPLICATION
 ### Selecting workdir
 WORKDIR $ROOT_WORKDIR
 
-### Installing used software. Thanks to build_vncserver.sh the following install line, APP_LINE_2 and APP_LINE_3
-### can be automatically replaced to install the desired application by using wget from a dedicated repository
-### instead of the default apt-get install
+### Installing used software.
 RUN apt-get update
 RUN apt-get install -y $APPLICATION
-### APP_LINE_2
-### APP_LINE_3
 
 ### Cleaning up
 RUN apt-get --purge autoremove -y && \

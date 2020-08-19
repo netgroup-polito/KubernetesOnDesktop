@@ -25,6 +25,8 @@ pulsePort=34567
 #List of supported apps
 supported_apps=("firefox" "libreoffice")
 supported_protocols=("vnc" "novnc")
+#Variable containing the k8s namespace to be used
+k8s_namespace="k8s-on-desktop"
 #Variable to select whether to use pvc or not
 use_pvc=0
 #Variable containing the ssh secret name
@@ -106,12 +108,79 @@ function scan_node_port {
 
 #Retrieving the ip, ports, pod name and namespace
 function retrieve_pod_info {
-	read -r targetNodeIp targetPodName targetPodNamespace <<<$(kubectl get pod -l app=$application_name -o "jsonpath={..status.hostIP} {.items..metadata.name} {.items..metadata.namespace}")
+	read -r targetNodeIp targetPodName targetPodNamespace <<<$(kubectl get pod -l app=$application_name -n $k8s_namespace -o "jsonpath={..status.hostIP} {.items..metadata.name} {.items..metadata.namespace}")
 	if [[ $enc -eq 1 ]]; then
-		read -r targetNodePortSsh <<<$(kubectl get svc -l app=$application_name -o 'jsonpath={..spec.ports[?(@.name=="ssh-svc-port")].nodePort}')
+		read -r targetNodePortSsh <<<$(kubectl get svc -l app=$application_name -n $k8s_namespace -o 'jsonpath={..spec.ports[?(@.name=="ssh-svc-port")].nodePort}')
 	else
-		read -r targetNodePortProtocol targetNodePortSsh <<<$(kubectl get svc -l app=$application_name -o 'jsonpath={..spec.ports[?(@.name=="'${protocol}'-svc-port")].nodePort} {..spec.ports[?(@.name=="ssh-svc-port")].nodePort}')
+		read -r targetNodePortProtocol targetNodePortSsh <<<$(kubectl get svc -l app=$application_name -n $k8s_namespace -o 'jsonpath={..spec.ports[?(@.name=="'${protocol}'-svc-port")].nodePort} {..spec.ports[?(@.name=="ssh-svc-port")].nodePort}')
 	fi
+}
+
+#Function to get the current k8s node info
+function retrieve_curr_k8s_node_info {
+	#Retrieveing the node_name and node_address
+	old_IFS=$IFS
+	IFS='#' read -r -a current_node_info <<< $(kubectl get nodes -l kubernetes.io/hostname=`cat /etc/hostname` -o 'jsonpath={range .items[0].status.addresses[*]}{.type}={.address}#{end}')
+	for ((i=0; i<${#current_node_info[@]}; i++)); do 
+		if [[ $(echo ${current_node_info[$i]} | cut -d '=' -f 1) == "Hostname" ]];then
+			current_node_name=$(echo ${current_node_info[$i]} | cut -d '=' -f 2)
+		fi
+		if [[ $(echo ${current_node_info[$i]} | cut -d '=' -f 1) == "InternalIP" ]];then
+			current_node_address=$(echo ${current_node_info[$i]} | cut -d '=' -f 2)
+		fi
+	done
+	IFS=$old_IFS
+}
+
+#Function to prepare the cluster for the cloudify execution
+function prepare_cluster {
+	echo -n "Check $k8s_namespace namespace existence..."
+	#Check namespace existence
+	if [[ $(kubectl get ns | grep $k8s_namespace) == "" ]]; then
+		echo -n "It doesn't exist! => Creating namespace..."
+		#Create namespace
+		kubectl create ns $k8s_namespace &>/dev/null
+		#Check namespace creation
+		if [ $? -ne 0 ]; then
+			echo "Error: Unable to create the namespace. Running ${application_name} locally"
+			clear_and_exit 7
+		fi
+		echo "OK"
+	else
+		echo "It exists"
+	fi
+	
+	#Add label to namespace useful to apply resources on liqo.io
+	echo -n "Apply liqo.io/enabled=true label to $k8s_namespace namespace..."
+	kubectl label ns $k8s_namespace "liqo.io/enabled=true" --overwrite &>/dev/null
+	#Check label return conde
+	if [ $? -ne 0 ]; then
+		echo "Error: Unable to apply label the namespace. Running ${application_name} locally"
+		clear_and_exit 8
+	fi
+	echo "OK"
+
+	#Add label to the current node to avoid vncserver pod scheduling
+	retrieve_curr_k8s_node_info
+	echo -n "Apply k8s-on-desktop/vncviewer=true label to the current node ($current_node_name)..."
+	kubectl label no $current_node_name "k8s-on-desktop/vncviewer=true" --overwrite &>/dev/null
+	#Check label return conde
+	if [ $? -ne 0 ]; then
+		echo "Error: Unable to apply label the current node. Running ${application_name} locally"
+		clear_and_exit 9
+	fi
+	echo "OK"
+}
+
+#Function to remove the namespace and the labels created in prepare_cluster
+function clean_cluster {
+	#Remove node label if exists
+	echo -n "Removing k8s-on-desktop/vncviewer label from current node ($current_node_name)..."
+	kubectl label no $current_node_name "k8s-on-desktop/vncviewer-" &>/dev/null
+	echo "OK"
+
+	# #Remove namespace
+	# kubectl delete ns $k8s_namespace &>/dev/null
 }
 
 #Function that runs the native vnc application
@@ -219,19 +288,6 @@ function adjust_and_apply_pod {
 	cp ${tigervncPodFile} "${working_dir}/vncviewer.yaml"
 	tigervncPodFile="${working_dir}/vncviewer.yaml"
 
-	#Retrieveing the node_name and node_address
-	old_IFS=$IFS
-	IFS='#' read -r -a current_node_info <<< $(kubectl get nodes -l kubernetes.io/hostname=`cat /etc/hostname` -o 'jsonpath={range .items[0].status.addresses[*]}{.type}={.address}#{end}')
-	for ((i=0; i<${#current_node_info[@]}; i++)); do 
-		if [[ $(echo ${current_node_info[$i]} | cut -d '=' -f 1) == "Hostname" ]];then
-			current_node_name=$(echo ${current_node_info[$i]} | cut -d '=' -f 2)
-		fi
-		if [[ $(echo ${current_node_info[$i]} | cut -d '=' -f 1) == "InternalIP" ]];then
-			current_node_address=$(echo ${current_node_info[$i]} | cut -d '=' -f 2)
-		fi
-	done
-	IFS=$old_IFS
-
 	# #Check that currente node name != "" and exists in the cluster
 	# if [[ $current_node_name == "" ]] || [[ $(kubectl get node | grep $current_node_name) == "" ]]; then
 	# 	echo "Error: Wrong node name. '$current_node_name' is not a cluster node name."
@@ -239,7 +295,7 @@ function adjust_and_apply_pod {
 	# fi
 
 	# #Check that internalIP has xxx.xxx.xxx.xxx template and corresponds to the one bound to the current node name
-	# if [[ $current_node_address != $(grep -oE '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}' <<< $(kubectl get node -o wide | grep "rar-k8s-client-01")) ]]; then
+	# if [[ $current_node_address != $(grep -oE '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}' <<< $(kubectl get node -o wide | grep $current_node_name)) ]]; then
 	# 	echo "Error: Wrong node IP address."
 	# 	clear_and_exit 5
 	# fi
@@ -277,12 +333,12 @@ function adjust_and_apply_pod {
 	sed -i "s#RAR_015_WORKING_DIR#$working_dir#g" $tigervncPodFile
 
 	#Applying the pod to the current node and wait for the process completion
-	kubectl apply -f $tigervncPodFile &>/dev/null && ((state++))
+	kubectl apply -f $tigervncPodFile -n $k8s_namespace &>/dev/null && ((state++))
 	#state=3 ; enc=0,1 ; run_mode=2
 
 	#Waiting for the pod to start
 	echo -n "Waiting for vncviewer pod to start, max ${timeout} seconds..."
-	kubectl wait --for=condition=Ready pod -l "app=${tigervnc_pod_app_name}" --timeout=${timeout}s &>/dev/null
+	kubectl wait --for=condition=Ready pod -l "app=${tigervnc_pod_app_name}" --timeout=${timeout}s -n $k8s_namespace &>/dev/null
 
 	#Check that vncviewer pod is running, otherwise exit
 	if [ $? -ne 0 ]; then
@@ -410,8 +466,13 @@ function start_deploy {
 			#Register Ctr+C interrupt
 			trap 'clear_and_exit -1' INT TERM KILL EXIT QUIT HUP
 
+			#Preparing the cluster by creating the k8s-on-desktop namespace and 
+			#appling the label k8s-on-desktop/viewer=true to the current node 
+			#to avoid the vncserver pod to be scheduled on current node
+			prepare_cluster
+
 			echo -n "Creating ssh secret..."
-			kubectl create secret generic $ssh_secret_name --from-file=authorized_keys="${working_dir}/id_rsa.pub" &>/dev/null && ((state++))
+			kubectl create secret generic $ssh_secret_name --from-file=authorized_keys="${working_dir}/id_rsa.pub" -n $k8s_namespace &>/dev/null && ((state++))
 			#state=1 ; enc=0,1 ; run_mode=0,1,2
 
 			if [ $state -gt 0 ]; then
@@ -428,9 +489,9 @@ function start_deploy {
 				# a- if the second apply fails the state increment will not be done and the resources will not be allocated
 				# b- we don't care about the first apply because the pvc will never be deleted
 				if [ $use_pvc -eq 1 ]; then
-					kubectl apply -f $pvcDeploy &>/dev/null && kubectl apply -f $targetDeploy &>/dev/null && ((state++))
+					kubectl apply -f $pvcDeploy -n $k8s_namespace &>/dev/null && kubectl apply -f $targetDeploy -n $k8s_namespace &>/dev/null && ((state++))
 				else
-					kubectl apply -f $targetDeploy &>/dev/null && ((state++))
+					kubectl apply -f $targetDeploy -n $k8s_namespace &>/dev/null && ((state++))
 				fi
 				#state=2 ; enc=0,1 ; run_mode=0,1,2
 
@@ -439,7 +500,7 @@ function start_deploy {
 
 					#Waiting for the pod to start
 					echo -n "Waiting for pod to start, max ${timeout}seconds..."
-					kubectl wait --for=condition=Ready pod -l "app=${application_name}" --timeout=${timeout}s &>/dev/null
+					kubectl wait --for=condition=Ready pod -l "app=${application_name}" --timeout=${timeout}s -n $k8s_namespace &>/dev/null
 		
 					if [ $? -eq 0 ]; then
 						echo "OK pod running"
@@ -500,7 +561,7 @@ function clear_and_exit {
 	if [ $state -ge 3 ] && [ $run_mode -eq 2 ]; then
 		#Deleteing the pod that was executing vncviewer
 		echo -n "Deleting the vncviewer pod..."
-		kubectl delete -f $tigervncPodFile &>/dev/null
+		kubectl delete -f $tigervncPodFile -n $k8s_namespace &>/dev/null
 		echo "OK"
 	fi
 
@@ -521,16 +582,19 @@ function clear_and_exit {
 	if [ $state -ge 2 ]; then
 		#Deleting deploy on cluster
 		echo -n "Deleting deploy on cluster..."
-		kubectl delete -f $targetDeploy &>/dev/null
+		kubectl delete -f $targetDeploy -n $k8s_namespace &>/dev/null
 		echo "OK"
 	fi
 
 	if [ $state -ge 1 ]; then
 		#Deleting ssh secret on cluster
 		echo -n "Deleting ssh secret on cluster..."
-		kubectl delete secret $ssh_secret_name &>/dev/null
+		kubectl delete secret $ssh_secret_name -n $k8s_namespace &>/dev/null
 		echo "OK"
 	fi
+
+	#Remove node k8s-on-desktop/viewer label
+	clean_cluster
 
 	echo "Process completed"
 	
