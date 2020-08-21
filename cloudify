@@ -27,6 +27,8 @@ supported_apps=("firefox" "libreoffice")
 supported_protocols=("vnc" "novnc")
 #Variable containing the k8s namespace to be used
 k8s_namespace="k8s-on-desktop"
+#Variable containing the ssh port
+ssh_port=22
 #Variable to select whether to use pvc or not
 use_pvc=0
 #Variable containing the ssh secret name
@@ -361,8 +363,21 @@ function adjust_and_apply_pod {
 	done
 }
 
-#Function to connect to target
-function connect {
+#Function to prepare the environment for run_mode 0-1
+function prepare_env_runmode_0_1 {
+	echo -n "Retrieving node IP and PORT..."
+	retrieve_pod_info
+	echo "OK ip -> ${targetNodeIp}, $protocol -> ${targetNodePortProtocol}, ssh -> ${targetNodePortSsh}, podName -> ${targetPodName}, podNs -> ${targetPodNamespace}"
+
+	echo -n "Waiting for the NodePort to be opened..."
+	scan_node_port
+
+	if [ $? -ne 0 ]; then
+		echo "ERROR Nodeport took too much to be opened, running ${application_name} locally"
+		clear_and_exit 4
+	fi
+	echo "OK port opened"
+
 	#Set port depending on choosed protocol
 	if [ $enc -eq 1 ]; then
 		if [ "$protocol" = "vnc" ]; then
@@ -383,15 +398,45 @@ function connect {
 			target="$targetNodeIp::$targetNodePortProtocol"
 		fi
 	fi
+}
 
+#Function to prepare the environment for run_mode 0-1
+function prepare_env_runmode_2 {
+	#Vnc port
+	port=5900
+
+	#Variable containing the vncserver service URL
+	svc_URL=$application_name"-service."$k8s_namespace".svc"
+
+	#Building target
+	if [ $enc -eq 1 ]; then
+		echo "Starting encrypted VNC connection..."
+		target="localhost::$port"
+	else
+		echo "Starting clear VNC connection..."
+		target="$svc_URL::$port"
+	fi
+
+	#Use the svc URL instead of pod node IP
+	targetNodeIp=$svc_URL
+
+	#Use deployment ssh port instad of the nodeport port
+	targetNodePortSsh=$ssh_port
+}
+
+#Function to connect to target
+function connect {
 	case $run_mode in
 		0)	#Native app (N.B. the protocol could be vnc or novnc)
+			prepare_env_runmode_0_1
 			run_native_vncviewver_novnc_application
 			;;
 		1)	#Docker container (N.B. the protocol must be vnc)
+			prepare_env_runmode_0_1
 			create_container_and_launch_vncviewer ${enc} ${compression} ${quality} ${target} ${token} ${targetNodeIp} ${targetNodePortSsh} ${port}
 			;;
 		2)	#K8s pod (N.B. the protocol must be vnc)
+			prepare_env_runmode_2
 			adjust_and_apply_pod ${enc} ${compression} ${quality} ${target} ${token} ${port} ${targetNodeIp} ${targetNodePortSsh}
 			echo "Completed."
 			;;
@@ -504,21 +549,8 @@ function start_deploy {
 		
 					if [ $? -eq 0 ]; then
 						echo "OK pod running"
-
-						echo -n "Retrieving node IP and PORT..."
-						retrieve_pod_info
-						echo "OK ip -> ${targetNodeIp}, $protocol -> ${targetNodePortProtocol}, ssh -> ${targetNodePortSsh}, podName -> ${targetPodName}, podNs -> ${targetPodNamespace}"
-
-						echo -n "Waiting for the NodePort to be opened..."
-						scan_node_port
-
-						if [ $? -eq 0 ]; then
-							echo "OK port opened"
-							connect
-							return
-						else
-							echo "ERROR Nodeport took too much to be opened, running ${application_name} locally"
-						fi
+						connect
+						return
 					else
 						echo "ERROR cannot create pod, running ${application_name} locally"
 					fi
