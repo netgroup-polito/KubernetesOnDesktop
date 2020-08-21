@@ -31,8 +31,6 @@ k8s_namespace="k8s-on-desktop"
 ssh_port=22
 #Variable to select whether to use pvc or not
 use_pvc=0
-#Variable containing the ssh secret name
-ssh_secret_name="rar-ssh-secret"
 #The vncviewer pod file
 tigervncPodFile="$folder/kubernetes/vncviewer.yaml"
 #vncviewer run mode (0-> native app, 1-> docker container, 2-> k8s pod)
@@ -55,8 +53,10 @@ function adjust_encription {
 }
 
 #Set application name in deployment
-function adjust_appname {
-	sed -i "s/XXXXXXXXXX/${application_name}/" ${targetDeploy}
+function adjust_appname_pid_secret {
+	sed -i "s/RAR_001_APP_NAME_PID/${vnc_srv_app_pid}/" ${targetDeploy}
+	sed -i "s/RAR_002_APP_NAME/${application_name}/" ${targetDeploy}
+	sed -i "s/RAR_003_SSH_SECRET/${ssh_secret_name}/" ${targetDeploy}
 }
 
 #Set the new generated token
@@ -68,7 +68,7 @@ function adjust_token {
 }
 
 function adjust_volumes {
-	from=`grep -n "XXXXXXXXXX-persistent-storage" ${targetDeploy} | cut -d : -f -1`
+	from=`grep -n "RAR_002_APP_NAME-persistent-storage" ${targetDeploy} | cut -d : -f -1`
 	((to=from+2))
 	sed -i "${from},${to} {s/^#//g}" ${targetDeploy}
 
@@ -110,11 +110,11 @@ function scan_node_port {
 
 #Retrieving the ip, ports, pod name and namespace
 function retrieve_pod_info {
-	read -r targetNodeIp targetPodName targetPodNamespace <<<$(kubectl get pod -l app=$application_name -n $k8s_namespace -o "jsonpath={..status.hostIP} {.items..metadata.name} {.items..metadata.namespace}")
+	read -r targetNodeIp targetPodName targetPodNamespace <<<$(kubectl get pod -l app=$vnc_srv_app_pid -n $k8s_namespace -o "jsonpath={..status.hostIP} {.items..metadata.name} {.items..metadata.namespace}")
 	if [[ $enc -eq 1 ]]; then
-		read -r targetNodePortSsh <<<$(kubectl get svc -l app=$application_name -n $k8s_namespace -o 'jsonpath={..spec.ports[?(@.name=="ssh-svc-port")].nodePort}')
+		read -r targetNodePortSsh <<<$(kubectl get svc -l app=$vnc_srv_app_pid -n $k8s_namespace -o 'jsonpath={..spec.ports[?(@.name=="ssh-svc-port")].nodePort}')
 	else
-		read -r targetNodePortProtocol targetNodePortSsh <<<$(kubectl get svc -l app=$application_name -n $k8s_namespace -o 'jsonpath={..spec.ports[?(@.name=="'${protocol}'-svc-port")].nodePort} {..spec.ports[?(@.name=="ssh-svc-port")].nodePort}')
+		read -r targetNodePortProtocol targetNodePortSsh <<<$(kubectl get svc -l app=$vnc_srv_app_pid -n $k8s_namespace -o 'jsonpath={..spec.ports[?(@.name=="'${protocol}'-svc-port")].nodePort} {..spec.ports[?(@.name=="ssh-svc-port")].nodePort}')
 	fi
 }
 
@@ -318,8 +318,9 @@ function adjust_and_apply_pod {
 	done
 	
 	#Replace the pod parameters with their values
+	sed -i "s#RAR_000_APP_NAME_PID#$vnc_cli_app_pid#g" $tigervncPodFile
 	sed -i "s#RAR_001_K8S_NODE_NAME#$current_node_name#g" $tigervncPodFile
-	sed -i "s#RAR_002_TIGERVNC_CONTAINER_NAME#$tigervnc_container_name#g" $tigervncPodFile
+	sed -i "s#RAR_002_TIGERVNC_CONTAINER_NAME#$vnc_cli_app_pid#g" $tigervncPodFile
 	sed -i "s#RAR_003_TIGERVNC_DOCKER#$tigervnc_docker#g" $tigervncPodFile
 	sed -i "s#RAR_004_ENC#enc=$enc#g" $tigervncPodFile
 	sed -i "s#RAR_005_POD#pod=1#g" $tigervncPodFile
@@ -340,7 +341,7 @@ function adjust_and_apply_pod {
 
 	#Waiting for the pod to start
 	echo -n "Waiting for vncviewer pod to start, max ${timeout} seconds..."
-	kubectl wait --for=condition=Ready pod -l "app=${tigervnc_pod_app_name}" --timeout=${timeout}s -n $k8s_namespace &>/dev/null
+	kubectl wait --for=condition=Ready pod -l "app=${vnc_cli_app_pid}" --timeout=${timeout}s -n $k8s_namespace &>/dev/null
 
 	#Check that vncviewer pod is running, otherwise exit
 	if [ $? -ne 0 ]; then
@@ -406,7 +407,7 @@ function prepare_env_runmode_2 {
 	port=5900
 
 	#Variable containing the vncserver service URL
-	svc_URL=$application_name"-service."$k8s_namespace".svc"
+	svc_URL=$vnc_srv_app_pid"-service."$k8s_namespace".svc"
 
 	#Building target
 	if [ $enc -eq 1 ]; then
@@ -483,7 +484,7 @@ function start_deploy {
 	fi
 
 	adjust_encription
-	adjust_appname
+	adjust_appname_pid_secret
 	adjust_protocol
 	
 	#Checking connectivity
@@ -545,7 +546,7 @@ function start_deploy {
 
 					#Waiting for the pod to start
 					echo -n "Waiting for pod to start, max ${timeout}seconds..."
-					kubectl wait --for=condition=Ready pod -l "app=${application_name}" --timeout=${timeout}s -n $k8s_namespace &>/dev/null
+					kubectl wait --for=condition=Ready pod -l "app=${vnc_srv_app_pid}" --timeout=${timeout}s -n $k8s_namespace &>/dev/null
 		
 					if [ $? -eq 0 ]; then
 						echo "OK pod running"
@@ -674,6 +675,18 @@ function main() {
 	if [ $# -lt 1 ] || ! ( IFS=$'\n'; echo "${supported_apps[*]}" ) | grep -qFx "$application_name" &>/dev/null; then
 		print_usage_and_exit 1
 	fi
+
+	#Variable containing random alphanumeric string used as PID
+	app_pid=$(cat /dev/urandom | tr -dc 'a-z0-9' | fold -w 10 | head -n 1)
+
+	#Variable containing the ssh secret name
+	ssh_secret_name="rar-ssh-secret-"$app_pid
+
+	#Generating app names
+	echo -n "Generating VNC AppName and pid..."
+	vnc_srv_app_pid="$application_name-$app_pid"
+	vnc_cli_app_pid="$tigervnc_container_name-$app_pid"
+	echo "OK"
 
 	while getopts "hec:q:t:p:v:r:" opt; do
 		case $opt in

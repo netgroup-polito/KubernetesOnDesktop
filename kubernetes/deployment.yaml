@@ -2,16 +2,16 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: XXXXXXXXXX-deployment
+  name: RAR_001_APP_NAME_PID-deployment
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: XXXXXXXXXX
+      app: RAR_001_APP_NAME_PID
   template:
     metadata:
       labels:
-        app: XXXXXXXXXX
+        app: RAR_001_APP_NAME_PID
     spec:
       affinity:
         nodeAffinity:
@@ -28,14 +28,14 @@ spec:
       #Secret containing the ssh public key
       - name: ssh-secret
         secret:
-          secretName: rar-ssh-secret
+          secretName: RAR_003_SSH_SECRET
       #User home directory
-#      - name: XXXXXXXXXX-persistent-storage
+#      - name: RAR_002_APP_NAME-persistent-storage
 #        persistentVolumeClaim:
-#          claimName: XXXXXXXXXX-pv-claim
+#          claimName: RAR_002_APP_NAME-pv-claim
       containers:
-      - name: XXXXXXXXXX-kubernetes
-        image: riccardoroccaro/XXXXXXXXXX-headless-vnc:stable
+      - name: RAR_001_APP_NAME_PID-kubernetes
+        image: riccardoroccaro/RAR_002_APP_NAME-headless-vnc:stable
         imagePullPolicy: IfNotPresent
         env:
         #Local pod pulse server
@@ -77,16 +77,16 @@ spec:
       terminationGracePeriodSeconds: 0
 ---
 #Service config
-#Substitute XXXXXXXXXX with the desired application name
+#Substitute RAR_001_APP_NAME_PID with the desired application name
 apiVersion: v1
 kind: Service
 metadata:
-  name: XXXXXXXXXX-service
+  name: RAR_001_APP_NAME_PID-service
   labels:
-    app: XXXXXXXXXX
+    app: RAR_001_APP_NAME_PID
 spec:
   selector:
-    app: XXXXXXXXXX
+    app: RAR_001_APP_NAME_PID
   ports:
   - name: novnc-svc-port
     protocol: TCP
