@@ -181,9 +181,6 @@ function clean_cluster {
 	echo -n "Removing $viewer_ns_label label from current node ($current_node_name)..."
 	kubectl label no $current_node_name "$viewer_ns_label-" &>/dev/null
 	echo "OK"
-
-	# #Remove namespace
-	# kubectl delete ns $k8s_namespace &>/dev/null
 }
 
 #Function that runs the native vnc application
@@ -290,18 +287,6 @@ function adjust_and_apply_pod {
 	#For safety let's copy the pod file and modify the temporary one
 	cp ${tigervncPodFile} "${working_dir}/vncviewer.yaml"
 	tigervncPodFile="${working_dir}/vncviewer.yaml"
-
-	# #Check that currente node name != "" and exists in the cluster
-	# if [[ $current_node_name == "" ]] || [[ $(kubectl get node | grep $current_node_name) == "" ]]; then
-	# 	echo "Error: Wrong node name. '$current_node_name' is not a cluster node name."
-	# 	clear_and_exit 4
-	# fi
-
-	# #Check that internalIP has xxx.xxx.xxx.xxx template and corresponds to the one bound to the current node name
-	# if [[ $current_node_address != $(grep -oE '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}' <<< $(kubectl get node -o wide | grep $current_node_name)) ]]; then
-	# 	echo "Error: Wrong node IP address."
-	# 	clear_and_exit 5
-	# fi
 
 	#Get a free tcp port to listen to
 	while true; do
@@ -514,7 +499,7 @@ function start_deploy {
 			trap 'clear_and_exit -1' INT TERM KILL EXIT QUIT HUP
 
 			#Preparing the cluster by creating the k8s-on-desktop namespace and 
-			#appling the label k8s-on-desktop/viewer=true to the current node 
+			#appling the label k8s-on-desktop/viewer-<pid>=true to the current node 
 			#to avoid the vncserver pod to be scheduled on current node
 			prepare_cluster
 
