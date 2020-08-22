@@ -18,7 +18,7 @@ spec:
           requiredDuringSchedulingIgnoredDuringExecution:
             nodeSelectorTerms:
               - matchExpressions:
-                - key: k8s-on-desktop/vncviewer
+                - key: RAR_004_NS_LABEL
                   operator: DoesNotExist
       volumes:
       #Shared memory volume, to avoid crashes
@@ -73,7 +73,7 @@ spec:
         #Set max memory to avoid consumes and ensure minimum resources
         resources:
           limits:
-            memory: "1024Mi"
+            memory: "512Mi"
       terminationGracePeriodSeconds: 0
 ---
 #Service config

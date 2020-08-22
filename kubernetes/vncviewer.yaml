@@ -48,8 +48,8 @@ spec:
           #Replace args with appropriate values
           resources:
             requests:
-              memory: "1024Mi"
-              cpu: "500m"
+              memory: "512Mi"
+              cpu: "250m"
             limits:
               memory: "3072Mi"
               cpu: "756m" #=0.75cpu

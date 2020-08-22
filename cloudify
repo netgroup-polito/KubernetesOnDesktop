@@ -53,10 +53,11 @@ function adjust_encription {
 }
 
 #Set application name in deployment
-function adjust_appname_pid_secret {
+function adjust_appname_pid_secret_label {
 	sed -i "s/RAR_001_APP_NAME_PID/${vnc_srv_app_pid}/" ${targetDeploy}
 	sed -i "s/RAR_002_APP_NAME/${application_name}/" ${targetDeploy}
 	sed -i "s/RAR_003_SSH_SECRET/${ssh_secret_name}/" ${targetDeploy}
+	sed -i "s#RAR_004_NS_LABEL#${viewer_ns_label}#" ${targetDeploy}
 }
 
 #Set the new generated token
@@ -164,8 +165,8 @@ function prepare_cluster {
 
 	#Add label to the current node to avoid vncserver pod scheduling
 	retrieve_curr_k8s_node_info
-	echo -n "Apply k8s-on-desktop/vncviewer=true label to the current node ($current_node_name)..."
-	kubectl label no $current_node_name "k8s-on-desktop/vncviewer=true" --overwrite &>/dev/null
+	echo -n "Apply $viewer_ns_label=true label to the current node ($current_node_name)..."
+	kubectl label no $current_node_name "$viewer_ns_label=true" --overwrite &>/dev/null
 	#Check label return conde
 	if [ $? -ne 0 ]; then
 		echo "Error: Unable to apply label the current node. Running ${application_name} locally"
@@ -177,8 +178,8 @@ function prepare_cluster {
 #Function to remove the namespace and the labels created in prepare_cluster
 function clean_cluster {
 	#Remove node label if exists
-	echo -n "Removing k8s-on-desktop/vncviewer label from current node ($current_node_name)..."
-	kubectl label no $current_node_name "k8s-on-desktop/vncviewer-" &>/dev/null
+	echo -n "Removing $viewer_ns_label label from current node ($current_node_name)..."
+	kubectl label no $current_node_name "$viewer_ns_label-" &>/dev/null
 	echo "OK"
 
 	# #Remove namespace
@@ -484,7 +485,7 @@ function start_deploy {
 	fi
 
 	adjust_encription
-	adjust_appname_pid_secret
+	adjust_appname_pid_secret_label
 	adjust_protocol
 	
 	#Checking connectivity
@@ -686,6 +687,7 @@ function main() {
 	echo -n "Generating VNC AppName and pid..."
 	vnc_srv_app_pid="$application_name-$app_pid"
 	vnc_cli_app_pid="$tigervnc_container_name-$app_pid"
+	viewer_ns_label="k8s-on-desktop/vncviewer-$app_pid"
 	echo "OK"
 
 	while getopts "hec:q:t:p:v:r:" opt; do
