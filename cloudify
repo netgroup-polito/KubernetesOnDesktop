@@ -23,7 +23,7 @@ enc=0
 #Pulseaudio port
 pulsePort=34567
 #List of supported apps
-supported_apps=("firefox" "libreoffice")
+supported_apps=("firefox" "libreoffice" "blender")
 supported_protocols=("vnc" "novnc")
 #Variable containing the k8s namespace to be used
 k8s_namespace="k8s-on-desktop"

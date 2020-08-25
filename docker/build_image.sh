@@ -16,7 +16,7 @@ owner_name="riccardoroccaro"
 repo_name="RAR_NOT_DEFINED"
 
 #Supported images
-image_pool=( "vncviewer" "base" "firefox" "libreoffice" )
+image_pool=( "vncviewer" "base" "firefox" "libreoffice" "blender" )
 
 #Repository pool
 declare -A repo_pool
@@ -24,6 +24,7 @@ repo_pool[${image_pool[0]}]="vncviewer"
 repo_pool[${image_pool[1]}]="base-headless-vnc"
 repo_pool[${image_pool[2]}]="firefox-headless-vnc"
 repo_pool[${image_pool[3]}]="libreoffice-headless-vnc"
+repo_pool[${image_pool[4]}]="blender-headless-vnc"
 
 #Dockerfile args and paths
 declare -A df_args_paths
@@ -31,6 +32,7 @@ df_args_paths[${image_pool[0]}]="./vncviewer"
 df_args_paths[${image_pool[1]}]="./vncserver/base_image"
 df_args_paths[${image_pool[2]}]="--build-arg APPLICATION=${image_pool[2]} ./vncserver/app_image"
 df_args_paths[${image_pool[3]}]="--build-arg APPLICATION=${image_pool[3]} ./vncserver/app_image"
+df_args_paths[${image_pool[4]}]="--build-arg APPLICATION=${image_pool[4]} --build-arg REPO_TO_ADD=ppa:thomas-schiex/blender ./vncserver/app_image"
 
 function print_usage_and_exit {
     echo "Build specified image and push it in DokerHub."
