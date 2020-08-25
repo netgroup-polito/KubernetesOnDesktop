@@ -164,23 +164,27 @@ function prepare_cluster {
 	echo "OK"
 
 	#Add label to the current node to avoid vncserver pod scheduling
-	retrieve_curr_k8s_node_info
-	echo -n "Apply $viewer_ns_label=true label to the current node ($current_node_name)..."
-	kubectl label no $current_node_name "$viewer_ns_label=true" --overwrite &>/dev/null
-	#Check label return conde
-	if [ $? -ne 0 ]; then
-		echo "Error: Unable to apply label the current node. Running ${application_name} locally"
-		clear_and_exit 9
+	if [[ $run_mode -eq 2 ]]; then
+		retrieve_curr_k8s_node_info
+		echo -n "Apply $viewer_ns_label=true label to the current node ($current_node_name)..."
+		kubectl label no $current_node_name "$viewer_ns_label=true" --overwrite &>/dev/null
+		#Check label return conde
+		if [ $? -ne 0 ]; then
+			echo "Error: Unable to apply label the current node. Running ${application_name} locally"
+			clear_and_exit 9
+		fi
+		echo "OK"
 	fi
-	echo "OK"
 }
 
 #Function to remove the namespace and the labels created in prepare_cluster
 function clean_cluster {
-	#Remove node label if exists
-	echo -n "Removing $viewer_ns_label label from current node ($current_node_name)..."
-	kubectl label no $current_node_name "$viewer_ns_label-" &>/dev/null
-	echo "OK"
+	if [[ $run_mode -eq 2 ]]; then
+		#Remove node label if exists
+		echo -n "Removing $viewer_ns_label label from current node ($current_node_name)..."
+		kubectl label no $current_node_name "$viewer_ns_label-" &>/dev/null
+		echo "OK"
+	fi
 }
 
 #Function that runs the native vnc application
