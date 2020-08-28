@@ -6,10 +6,18 @@
 #
 # *** Build the docker ***
 #
-# docker build --build-arg APPLICATION=<app_name> [--build-arg REPO_TO_ADD=<repo>] -t riccardoroccaro/<app_name>-headless-vnc:stable .
+# Default build
+# docker build --build-arg APPLICATION=<app_name> [--build-arg REPO_TO_ADD=<repo>] [--build-arg BASE_VER=<base version>] -t riccardoroccaro/<app_name>-headless-vnc:stable .
+#
+# Build with NVIDIA support - usefun when APPLICATION=blender
+# docker build --build-arg APPLICATION=blender --build-arg REPO_TO_ADD="ppa:thomas-schiex/blender" --build-arg FROM_IMAGE="riccardoroccaro/cuda_base-headless-vnc:stable" -t riccardoroccaro/cuda_blender-headless-vnc:stable .
 #
 
-FROM riccardoroccaro/base-headless-vnc:stable
+
+# Build argument that specifies which base image to start from.
+ARG FROM_IMAGE="riccardoroccaro/base-headless-vnc:stable"
+
+FROM ${FROM_IMAGE}
 LABEL maintainer="Riccardo Roccaro <r0cc4rd0@gmail.com>"
 ENV REFRESHED_AT 2020-08-25
 SHELL ["/bin/bash", "-c"]

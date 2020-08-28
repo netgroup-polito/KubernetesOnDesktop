@@ -6,10 +6,17 @@
 #
 # *** Build the docker ***
 #
+# Default build
 # docker build -t riccardoroccaro/base-headless-vnc:stable .
 #
+# Build with NVIDIA support
+# docker build -t riccardoroccaro/base-headless-vnc:cuda_stable --build-arg FROM_IMAGE="nvidia/cuda:10.2-runtime-ubuntu18.04"  .
+#
 
-FROM ubuntu:18.04
+# Build argument that specifies which image to start from.
+ARG FROM_IMAGE="ubuntu:18.04"
+
+FROM ${FROM_IMAGE}
 LABEL maintainer="Riccardo Roccaro <r0cc4rd0@gmail.com>"
 ENV REFRESHED_AT 2020-08-20
 
