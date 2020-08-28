@@ -100,7 +100,7 @@ function adjust_protocol {
 
 #Function to wait for the Nodeport to be opened
 function scan_node_port {
-	for i in seq 1 $timeout; do
+	for i in $(seq $timeout); do
 		nc -z $targetNodeIp $targetNodePortSsh
 		if [ $? -eq 0 ]; then
 			return 0
@@ -135,11 +135,22 @@ function retrieve_curr_k8s_node_info {
 	IFS=$old_IFS
 }
 
+#Function to test namespace existence
+function test_ns_existance {
+	for ns_token_to_test in $(kubectl get ns | grep $k8s_namespace); do
+		if [[ $ns_token_to_test == $k8s_namespace ]]; then
+			return 0
+		fi
+	done
+	return 1
+}
+
 #Function to prepare the cluster for the cloudify execution
 function prepare_cluster {
 	echo -n "Check $k8s_namespace namespace existence..."
 	#Check namespace existence
-	if [[ $(kubectl get ns | grep $k8s_namespace) == "" ]]; then
+	test_ns_existance
+	if [[ $? -eq 1 ]]; then
 		echo -n "It doesn't exist! => Creating namespace..."
 		#Create namespace
 		kubectl create ns $k8s_namespace &>/dev/null
