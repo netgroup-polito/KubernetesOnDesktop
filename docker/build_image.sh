@@ -16,17 +16,17 @@ owner_name="riccardoroccaro"
 repo_name="RAR_NOT_DEFINED"
 
 #Supported images
-image_pool=( "vncviewer" "base" "firefox" "libreoffice" "blender" "cuda_base" "cuda_blender" )
+image_pool=( "vncviewer" "base" "firefox" "libreoffice" "blender" "cuda-base" "cuda-blender" )
 
 #Repository pool
 declare -A repo_pool
-repo_pool[${image_pool[0]}]="vncviewer"
-repo_pool[${image_pool[1]}]="base-headless-vnc"
-repo_pool[${image_pool[2]}]="firefox-headless-vnc"
-repo_pool[${image_pool[3]}]="libreoffice-headless-vnc"
-repo_pool[${image_pool[4]}]="blender-headless-vnc"
-repo_pool[${image_pool[5]}]="cuda_base-headless-vnc"
-repo_pool[${image_pool[6]}]="cuda_blender-headless-vnc"
+repo_pool[${image_pool[0]}]="${image_pool[0]}"                  #vncviewer
+repo_pool[${image_pool[1]}]="${image_pool[1]}-headless-vnc"     #base
+repo_pool[${image_pool[2]}]="${image_pool[2]}-headless-vnc"     #firefox
+repo_pool[${image_pool[3]}]="${image_pool[3]}-headless-vnc"     #libreoffice
+repo_pool[${image_pool[4]}]="${image_pool[4]}-headless-vnc"     #blender
+repo_pool[${image_pool[5]}]="${image_pool[5]}-headless-vnc"     #cuda-base
+repo_pool[${image_pool[6]}]="${image_pool[6]}-headless-vnc"     #cuda-blender
 
 #Dockerfile args and paths
 declare -A df_args_paths
@@ -36,7 +36,7 @@ df_args_paths[${image_pool[2]}]="--build-arg APPLICATION=${image_pool[2]} ./vncs
 df_args_paths[${image_pool[3]}]="--build-arg APPLICATION=${image_pool[3]} ./vncserver/app_image"
 df_args_paths[${image_pool[4]}]="--build-arg APPLICATION=${image_pool[4]} --build-arg REPO_TO_ADD=ppa:thomas-schiex/blender ./vncserver/app_image"
 df_args_paths[${image_pool[5]}]="--build-arg FROM_IMAGE=nvidia/cuda:10.2-runtime-ubuntu18.04 ./vncserver/base_image"
-df_args_paths[${image_pool[6]}]="--build-arg FROM_IMAGE=$owner_name/cuda_base-headless-vnc:stable --build-arg APPLICATION=blender --build-arg REPO_TO_ADD=ppa:thomas-schiex/blender ./vncserver/app_image"
+df_args_paths[${image_pool[6]}]="--build-arg FROM_IMAGE=$owner_name/${repo_pool[${image_pool[5]}]}:stable --build-arg APPLICATION=blender --build-arg REPO_TO_ADD=ppa:thomas-schiex/blender ./vncserver/app_image"
 
 function print_usage_and_exit {
     echo "Build specified image and push it in DokerHub."
