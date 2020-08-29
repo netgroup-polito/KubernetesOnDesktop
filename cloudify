@@ -24,6 +24,8 @@ enc=0
 pulsePort=34567
 #List of supported apps
 supported_apps=("firefox" "libreoffice" "blender" "cuda-blender")
+#Creating cuda-blender alias
+alias cuda-blender=blender
 #List of supported protocols
 supported_protocols=("vnc" "novnc")
 #Variable containing the k8s namespace to be used
