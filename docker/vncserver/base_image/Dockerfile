@@ -10,10 +10,10 @@
 # docker build -t riccardoroccaro/base-headless-vnc:stable .
 #
 # Build with NVIDIA support
-# docker build -t riccardoroccaro/base-headless-vnc:cuda_stable --build-arg FROM_IMAGE="nvidia/cuda:10.2-runtime-ubuntu18.04"  .
+# docker build -t riccardoroccaro/cuda-base-headless-vnc:stable --build-arg FROM_IMAGE="nvidia/cuda:10.2-runtime-ubuntu18.04" .
 #
 
-# Build argument that specifies which image to start from.
+### Build argument that specifies which image to start from.
 ARG FROM_IMAGE="ubuntu:18.04"
 
 FROM ${FROM_IMAGE}
@@ -32,6 +32,7 @@ ENV DISPLAY=:0 \
     NO_VNC_PORT=5800 \
     SSH_PORT=22
 
+### Exposing required ports
 EXPOSE $VNC_PORT $NO_VNC_PORT $SSH_PORT
 
 ### Envrionment config
@@ -74,6 +75,7 @@ RUN mkdir -p $NO_VNC_HOME/utils/websockify && \
     ## create index.html to forward automatically to `vnc_lite.html`
     ln -s $NO_VNC_HOME/vnc_lite.html $NO_VNC_HOME/index.html
 
+### Setting locale
 RUN locale-gen en_US.UTF-8
 ENV LANG='en_US.UTF-8' LANGUAGE='en_US:en' LC_ALL='en_US.UTF-8'
 

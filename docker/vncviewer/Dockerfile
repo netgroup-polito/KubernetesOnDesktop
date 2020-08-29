@@ -3,7 +3,7 @@
 #============================#
 # *** Build tigervnc docker ***
 #
-# docker build -t riccardoroccaro/vncviewer:v1 .
+# docker build -t riccardoroccaro/vncviewer:stable .
 #
 # *** Run vncviewer in a container ***
 #
@@ -14,7 +14,7 @@
 #     -v /dev/shm:/dev/shm \
 #     -v /var/run/dbus:/var/run/dbus \
 #     -e DISPLAY \
-#     riccardoroccaro/vncviewer:v1 \
+#     riccardoroccaro/vncviewer:stable \
 #     enc=<enc> `#enc [1|0]` \
 #     pod=<pod> `#pod [1|0]` \
 #     compression=<CompressLevel> `#comression [0-6]` \
@@ -54,7 +54,7 @@
 # `--device /dev/snd`
 # with:
 # `-v /dev/snd:/dev/snd`
-# and adding before the image name (riccardoroccaro/vncviewer:v1) line the following:
+# and adding before the image name (riccardoroccaro/vncviewer:stable) line the following:
 # `--privileged`
 #
 
@@ -104,27 +104,38 @@ RUN apt-get purge wget -y && \
     rm -rf /var/cache/apt/archives/* && \
     rm -rf /var/lib/apt/lists/*
 
-# COPYING PULSEAUDIO CONFIG FILES
+#=================================#
+# COPYING PULSEAUDIO CONFIG FILES #
+#=================================#
 COPY [ "./resources/pulseaudio_config/client.conf", "./resources/pulseaudio_config/daemon.conf", "./resources/pulseaudio_config/default.pa", "/etc/pulse/" ]
 COPY [ "./resources/pulseaudio_config/avahi-daemon.conf", "/etc/avahi/" ]
 RUN chmod 777 /etc/pulse/*
 
-# COPYING EXECUTABLE ENTRYPOINT
+#===============================#
+# COPYING EXECUTABLE ENTRYPOINT #
+#===============================#
 COPY ./resources/run_vncviewer.sh ${HOME}
 RUN chmod 777 ${HOME}/run_vncviewer.sh
 
-# USER SELECTION
+#================#
+# USER SELECTION #
+#================#
 USER ${USER}
 
-# STORAGE SELECTION
+#===================#
+# STORAGE SELECTION #
+#===================#
 WORKDIR ${HOME}
 
-# CREATING SSH IDENTITY AND SOCKET DIRECTORIES
+#==============================================#
+# CREATING SSH IDENTITY AND SOCKET DIRECTORIES #
+#==============================================#
 RUN mkdir ${HOME}/ssh_id_rsa
 ENV SSH_ID_RSA=${HOME}/ssh_id_rsa
 RUN mkdir ${HOME}/ssh_socket
 ENV SSH_SOCKET=${HOME}/ssh_socket
 
-
-# SETTING ENTRYPOINT
+#====================#
+# SETTING ENTRYPOINT #
+#====================#
 ENTRYPOINT [ "./run_vncviewer.sh" ]

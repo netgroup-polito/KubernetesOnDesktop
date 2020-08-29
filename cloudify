@@ -658,6 +658,8 @@ function print_usage_and_exit {
 	echo "|       default-> ${supported_run_modes[$default_run_mode]}." 
 	echo "|       Warning: this option can't be used if '-p novnc' is set"
 	echo "|"
+	echo "|-> app_name: application to run. Supported applications: $(IFS=','; echo "${supported_apps[*]}")"
+	echo "|"
 	echo "|->Example: ./cloudify firefox"
 	echo "|->Example: ./cloudify -q 7 -t 10 -e firefox"
 	echo "|->Example: ./cloudify -q 7 -t 10 -e -r 1 firefox"

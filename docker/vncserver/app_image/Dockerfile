@@ -7,14 +7,14 @@
 # *** Build the docker ***
 #
 # Default build
-# docker build --build-arg APPLICATION=<app_name> [--build-arg REPO_TO_ADD=<repo>] [--build-arg BASE_VER=<base version>] -t riccardoroccaro/<app_name>-headless-vnc:stable .
+# docker build --build-arg APPLICATION=<app_name> [--build-arg REPO_TO_ADD=<repo>] [--build-arg FROM_IMAGE=<base image>] -t riccardoroccaro/<app_name>-headless-vnc:stable .
 #
-# Build with NVIDIA support - usefun when APPLICATION=blender
-# docker build --build-arg APPLICATION=blender --build-arg REPO_TO_ADD="ppa:thomas-schiex/blender" --build-arg FROM_IMAGE="riccardoroccaro/cuda_base-headless-vnc:stable" -t riccardoroccaro/cuda_blender-headless-vnc:stable .
+# Build with NVIDIA support => so far, used when APPLICATION=blender
+# docker build --build-arg APPLICATION=blender --build-arg REPO_TO_ADD="ppa:thomas-schiex/blender" --build-arg FROM_IMAGE="riccardoroccaro/cuda-base-headless-vnc:stable" -t riccardoroccaro/cuda-blender-headless-vnc:stable .
 #
 
 
-# Build argument that specifies which base image to start from.
+### Build argument that specifies which base image to start from.
 ARG FROM_IMAGE="riccardoroccaro/base-headless-vnc:stable"
 
 FROM ${FROM_IMAGE}
@@ -22,10 +22,10 @@ LABEL maintainer="Riccardo Roccaro <r0cc4rd0@gmail.com>"
 ENV REFRESHED_AT 2020-08-25
 SHELL ["/bin/bash", "-c"]
 
-### Application we want to install (passed as argument from build.sh)
+### Application we want to install (passed as --build-arg from build_image.sh)
 ARG APPLICATION=unknown
 
-### Required repository to install the application we want (passed as argument from build.sh)
+### Required repository to install the application we want (passed as --build-arg from build_image.sh)
 ARG REPO_TO_ADD=unknown
 
 ### Environment config
@@ -55,11 +55,11 @@ RUN apt-get --purge autoremove -y && \
     rm -rf /var/cache/apt/archives/* && \
     rm -rf /var/lib/apt/lists/*
 
-### Copying files and set correct permissions
+### Copying files and giving them required privileges
 ADD config /opt/config
 RUN chmod -R 777 /opt/config/*
 
-### Overwrite OpenBox config
+### Overwriting OpenBox config
 RUN rm -rf /etc/xdg/openbox && \
     cp -R openbox /etc/xdg/openbox && \
     mv /etc/xdg/openbox/${APPLICATION}.xml /etc/xdg/openbox/rc.xml

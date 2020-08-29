@@ -9,7 +9,7 @@ ver="latest"
 #Push labels
 push=()
 
-#Owner name
+#Repositories owner name
 owner_name="riccardoroccaro"
 
 #Repository name
@@ -18,7 +18,7 @@ repo_name="RAR_NOT_DEFINED"
 #Supported images
 image_pool=( "vncviewer" "base" "firefox" "libreoffice" "blender" "cuda-base" "cuda-blender" )
 
-#Repository pool
+#Repository pool containing the repository name for each element of image_pool
 declare -A repo_pool
 repo_pool[${image_pool[0]}]="${image_pool[0]}"                  #vncviewer
 repo_pool[${image_pool[1]}]="${image_pool[1]}-headless-vnc"     #base
@@ -28,7 +28,7 @@ repo_pool[${image_pool[4]}]="${image_pool[4]}-headless-vnc"     #blender
 repo_pool[${image_pool[5]}]="${image_pool[5]}-headless-vnc"     #cuda-base
 repo_pool[${image_pool[6]}]="${image_pool[6]}-headless-vnc"     #cuda-blender
 
-#Dockerfile args and paths
+#Dockerfile args and paths (one for each element of image_pool)
 declare -A df_args_paths
 df_args_paths[${image_pool[0]}]="./vncviewer"
 df_args_paths[${image_pool[1]}]="./vncserver/base_image"
@@ -38,6 +38,7 @@ df_args_paths[${image_pool[4]}]="--build-arg APPLICATION=${image_pool[4]} --buil
 df_args_paths[${image_pool[5]}]="--build-arg FROM_IMAGE=nvidia/cuda:10.2-runtime-ubuntu18.04 ./vncserver/base_image"
 df_args_paths[${image_pool[6]}]="--build-arg FROM_IMAGE=$owner_name/${repo_pool[${image_pool[5]}]}:stable --build-arg APPLICATION=blender --build-arg REPO_TO_ADD=ppa:thomas-schiex/blender ./vncserver/app_image"
 
+# Function that prints the script usage and exit
 function print_usage_and_exit {
     echo "Build specified image and push it in DokerHub."
 	echo "Usage: $this_app_name [-h] [-r] [-v <build version>] [-p <push version>] -i <image>"
@@ -57,6 +58,7 @@ function print_usage_and_exit {
     exit $1
 }
 
+#Function that checks the image file existence and that removes it before being built again aftwards
 function image_rebuild {
     #Check whether the image exists or not
     sudo docker inspect $image_name:$ver &>/dev/null
@@ -73,6 +75,7 @@ function image_rebuild {
     fi
 }
 
+#Function that adds the -p parameter specified tags to the built image and that pushes it on Docker Hub
 function tag_and_push_images {
     for v_tag in ${push[@]}; do
         #Tagging the image
@@ -99,6 +102,8 @@ function tag_and_push_images {
     done
 }
 
+#Function that checks if the -i parameter specified image is supported and that
+#sets the image_name, the build args and the Dockerfile
 function retrieve_image_to_build {
     for image in ${image_pool[*]}; do
         if [[ $1 == $image ]]; then
@@ -107,7 +112,7 @@ function retrieve_image_to_build {
             #Set the repository name
             repo_name=${repo_pool[$image]}
 
-            #Create the image tag string
+            #Create the image name string (<repo_owner>/<repo>)
             image_name=$owner_name"/"$repo_name
 
             #Create the args and dockerfile path string
@@ -123,41 +128,44 @@ function retrieve_image_to_build {
 }
 
 function main {
-    #Retrieve this app name
+    #Retrieving this app name
     this_app_name=$0
 
+    #Retrieving the application parameters
     while getopts "hrv:p:i:" opt; do
         case $opt in
-            h)  #Print usage and exit
+            h)  #Printing usage and exit
                 print_usage_and_exit 0
                 ;;
-            r)  #Remove image if it already exists and build it again
+            r)  #Removing image if it already exists to let the application build it again afterwards
                 reb=1
                 echo "Set option 'rebuild forcing previous image remove'"
                 ;;
-            v)  #Version to build
+            v)  #Setting version to build
                 ver=$OPTARG
                 echo "Set image version $ver to be built"
                 ;;
-            p)  #Retrieve push versions
+            p)  #Retrieving versions to be pushed
                 push+=($OPTARG)
                 echo "Set image version $OPTARG to be pushed"
                 ;;
-            i)  #Retrieve image to build
+            i)  #Retrieving the image name to build
                 retrieve_image_to_build $OPTARG
                 ;;
-            \?) #Option unsupported
+            \?) #Unsupported option
                 echo "Error: unsupported option"
                 print_usage_and_exit 1
                 ;;
         esac
     done
 
+    #Checking if an image name has been specified with -i parameter
     if [[ $repo_name == "RAR_NOT_DEFINED" ]]; then
         echo "Error: image to build not set."
         print_usage_and_exit 3
     fi
 
+    #Checking if the image have to be rebuilt
     if [ $reb -eq 1 ]; then
         image_rebuild
     fi
