@@ -70,6 +70,12 @@ spec:
           #Libreoffice PVC claim
 #          - name: libreoffice-persistent-storage
 #            mountPath: /home/vncuser/Documents
+          #Blender PVC claim
+#          - name: blender-persistent-storage
+#            mountPath: /home/vncuser/Documents
+          #CUDA Blender PVC claim
+#          - name: cuda-blender-persistent-storage
+#            mountPath: /home/vncuser/Documents
         #Set max memory to avoid consumes and ensure minimum resources
         resources:
           limits:

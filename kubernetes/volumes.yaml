@@ -23,3 +23,29 @@ spec:
   resources:
     requests:
       storage: 3Gi
+---
+#Blender Files
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: blender-pv-claim
+spec:
+  storageClassName: rook-ceph-block
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 3Gi
+---
+#CUDA Blender Files
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: cuda-blender-pv-claim
+spec:
+  storageClassName: rook-ceph-block
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 3Gi
