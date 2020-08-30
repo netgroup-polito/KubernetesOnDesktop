@@ -1,18 +1,20 @@
 # Kubernetes On Desktop
 
-Developed by: **Simone Magnani** - **Antonio Riccardo Roccaro**
+Developed by: 
+* **Simone Magnani** (release/v1.0) 
+* **Antonio Riccardo Roccaro** (release/v2.0)
 
 Tutor: **Fulvio Risso** - **Alex Palesandro**
 
-Version: 1.0
+Version: v2.0
 
 Presentation slides: 
-* [KubernetesOnDesktop - Magnani](https://docs.google.com/presentation/d/15Dj8vwPaAyB_QmC_4886_E1K4pc7DzzlEPeiWJJMcCI/edit#slide=id.g742e3e7cd_1_16)
-* [KubernetesOnDesktop - Roccaro](https://docs.google.com/presentation/d/1wgvFvCxXwwiVH2EqXjM8Idhhes_Zjr_Ciq4St1TMbKE/edit?usp=sharing)
+* [KubernetesOnDesktop release/v1.0 - Magnani](https://docs.google.com/presentation/d/15Dj8vwPaAyB_QmC_4886_E1K4pc7DzzlEPeiWJJMcCI/edit#slide=id.g742e3e7cd_1_16)
+* [KubernetesOnDesktop release/v2.0 - Roccaro](https://docs.google.com/presentation/d/16z3NjHMjUr7YS_KgGWZ5komRSfAWSNqNonW72dKzagI/edit?usp=sharing)
 
-## Description
+## Introduction
 
-Cloud Computing course project with the aim of developing a cloud infrastructure to run user application in a remote cluster.
+KubernetesOnDesktop is a university project with the aim of developing a cloud infrastructure to run user application in a remote cluster.
 
 Thanks to the Netgroup Polito cluster, we have developed a very high performing infrastructure to let correctly configured users deploy applications and connect to them via many protocols.
 
@@ -65,7 +67,7 @@ The supported ones are:
 For the sake of simplicity, in this draw it has been omitted the entire network infrastructure (routers, other servers on cluster, etc.) of the cluster, leaving only the element in question.  
 
 
-![Infrastructure](res/Infrastructure.png)
+![Infrastructure](doc_images/Infrastructure.png)
 
 ### Deployment Phases
 
@@ -132,11 +134,11 @@ If everything was correct, a vncviewer window rendering the application will app
 
 Firefox (VNC)
 
-![Firefox using VNC](res/Firefox.png)
+![Firefox using VNC](doc_images/Firefox.png)
 
 Firefox (noVNC)
 
-![Firefox using noVNC](res/Firefox2.png)
+![Firefox using noVNC](doc_images/Firefox2.png)
 
 
 ## Acknowledgments
