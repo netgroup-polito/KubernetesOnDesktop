@@ -40,19 +40,19 @@ df_args_paths[${image_pool[6]}]="--build-arg FROM_IMAGE=$owner_name/${repo_pool[
 
 # Function that prints the script usage and exit
 function print_usage_and_exit {
-    echo "Build specified image and push it in DokerHub."
+    echo "Builds specified image and pushes it in DokerHub."
 	echo "Usage: $this_app_name [-h] [-r] [-v <build version>] [-p <push version>] -i <image>"
 	echo "|-> -h: start the helper menu"
-    echo "|-> -r: rebuild image by removing the existing one (if any() and building it again"
-    echo "|-> -v: specify the current build version. If not set $ver will be used"
-    echo "|-> -p: push the specified image version on DockerHub. It is possible to specify more than one version, one for each -p option."
+    echo "|-> -r: rebuild image by removing the existing one (if any) and building it again"
+    echo "|-> -v: specify the version to build. If not set, '$ver' will be used"
+    echo "|-> -p: push the -v specified image version on DockerHub. It is possible to specify more than one version, one for each -p option."
     echo "|       In any cases, the built image will be tagged with that versions and pushed on DockerHub"
     echo "|-> -i: (MANDATORY) the image to build. Supported images: $(IFS=','; echo "${image_pool[*]}")"
     echo "|"
 	echo "|->Example: $this_app_name -i firefox"
     echo "|->Example: $this_app_name -v v1.0 -i base"
     echo "|->Example: $this_app_name -v v2.0 -p v2.0 -p stable -p latest -i vncviewer"
-    echo "|           in this case the image with version v2.0 will be tagged with 'stable' and 'latest' versions and all that three"
+    echo "|           in this case the image with version v2.0 will be tagged with 'stable' and 'latest' versions and all that three tags"
     echo "|           will be pushed on DockerHub"
 
     exit $1
