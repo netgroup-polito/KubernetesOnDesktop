@@ -46,8 +46,6 @@ tigervnc_docker="riccardoroccaro/vncviewer:stable"
 tigervnc_dockerfile_path="$folder/docker/vncviewer"
 #TigerVNC container name (used to tag the container)
 tigervnc_container_name="riccardoroccaro-vncviewer"
-#TigerVNC viewer pod app name
-tigervnc_pod_app_name="riccardoroccaro-vncviewer"
 
 #Set SECURE_CONNECTION to 1/0 in deployment depending on encryption
 function adjust_encription {
@@ -266,12 +264,9 @@ function run_native_vncviewver_novnc_application {
 
 #Function that creates the vncviewer container and launches it
 function create_container_and_launch_vncviewer {
-	#Remove existing container if any
-	docker container rm $tigervnc_container_name &>/dev/null
-
 	#Create the container and run vncviewer
 	echo "Running vncviewer docker..."
-	docker run -d --name $tigervnc_container_name \
+	docker run -d --name $vnc_cli_app_pid \
 		-v ${working_dir}:/home/vnc/ssh_id_rsa \
 		-v /tmp/.X11-unix/:/tmp/.X11-unix/ \
 		--device /dev/snd:/dev/snd \
@@ -301,7 +296,7 @@ function create_container_and_launch_vncviewer {
 
 	#Wait for the docker to complete its execution
 	echo "Wait for the docker to complete its execution..."
-	docker wait $tigervnc_container_name &>/dev/null
+	docker wait $vnc_cli_app_pid &>/dev/null
 	echo "Done."
 }
 
@@ -612,7 +607,7 @@ function clear_and_exit {
 	if [ $state -ge 3 ] && [ $run_mode -eq 1 ]; then
 		#Deleting the container that was executing vncviewer
 		echo -n "Deleting the vncviewer container..."
-		docker container rm -f $tigervnc_container_name &>/dev/null
+		docker container rm -f $vnc_cli_app_pid &>/dev/null
 		echo "OK"
 	fi
 
