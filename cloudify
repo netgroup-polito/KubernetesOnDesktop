@@ -41,11 +41,11 @@ supported_run_modes=("0 (native app)" "1 (docker container)" "2 (k8s pod)")
 default_run_mode=0
 run_mode=$default_run_mode
 #TigerVNC viewer docker's name and version
-tigervnc_docker="riccardoroccaro/vncviewer:stable"
+tigervnc_docker="liqo/vncviewer:latest"
 #TigerVNC Dockerfile path
 tigervnc_dockerfile_path="$folder/docker/vncviewer"
 #TigerVNC container name (used to tag the container)
-tigervnc_container_name="riccardoroccaro-vncviewer"
+tigervnc_container_name="vncviewer"
 
 #Set SECURE_CONNECTION to 1/0 in deployment depending on encryption
 function adjust_encription {

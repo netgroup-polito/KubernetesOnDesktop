@@ -10,7 +10,7 @@ ver="latest"
 push=()
 
 #Repositories owner name
-owner_name="riccardoroccaro"
+owner_name="liqo"
 
 #Repository name
 repo_name="RAR_NOT_DEFINED"
@@ -36,7 +36,7 @@ df_args_paths[${image_pool[2]}]="--build-arg APPLICATION=${image_pool[2]} ./vncs
 df_args_paths[${image_pool[3]}]="--build-arg APPLICATION=${image_pool[3]} ./vncserver/app_image"
 df_args_paths[${image_pool[4]}]="--build-arg APPLICATION=${image_pool[4]} --build-arg REPO_TO_ADD=ppa:thomas-schiex/blender ./vncserver/app_image"
 df_args_paths[${image_pool[5]}]="--build-arg FROM_IMAGE=nvidia/cuda:10.2-runtime-ubuntu18.04 ./vncserver/base_image"
-df_args_paths[${image_pool[6]}]="--build-arg FROM_IMAGE=$owner_name/${repo_pool[${image_pool[5]}]}:stable --build-arg APPLICATION=blender --build-arg REPO_TO_ADD=ppa:thomas-schiex/blender ./vncserver/app_image"
+df_args_paths[${image_pool[6]}]="--build-arg FROM_IMAGE=$owner_name/${repo_pool[${image_pool[5]}]}:latest --build-arg APPLICATION=blender --build-arg REPO_TO_ADD=ppa:thomas-schiex/blender ./vncserver/app_image"
 
 # Function that prints the script usage and exit
 function print_usage_and_exit {

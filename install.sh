@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-repo_owner="riccardoroccaro"
+repo_owner="netgroup-polito"
 repo_branch="master"
 
 function install_from_local_repository {

@@ -7,10 +7,10 @@
 # *** Build the docker ***
 #
 # Default build
-# docker build -t riccardoroccaro/base-headless-vnc:stable .
+# docker build -t liqo/base-headless-vnc:latest .
 #
 # Build with NVIDIA support
-# docker build -t riccardoroccaro/cuda-base-headless-vnc:stable --build-arg FROM_IMAGE="nvidia/cuda:10.2-runtime-ubuntu18.04" .
+# docker build -t liqo/cuda-base-headless-vnc:latest --build-arg FROM_IMAGE="nvidia/cuda:10.2-runtime-ubuntu18.04" .
 #
 
 ### Build argument that specifies which image to start from.

@@ -7,15 +7,15 @@
 # *** Build the docker ***
 #
 # Default build
-# docker build --build-arg APPLICATION=<app_name> [--build-arg REPO_TO_ADD=<repo>] [--build-arg FROM_IMAGE=<base image>] -t riccardoroccaro/<app_name>-headless-vnc:stable .
+# docker build --build-arg APPLICATION=<app_name> [--build-arg REPO_TO_ADD=<repo>] [--build-arg FROM_IMAGE=<base image>] -t liqo/<app_name>-headless-vnc:latest .
 #
 # Build with NVIDIA support => so far, used when APPLICATION=blender
-# docker build --build-arg APPLICATION=blender --build-arg REPO_TO_ADD="ppa:thomas-schiex/blender" --build-arg FROM_IMAGE="riccardoroccaro/cuda-base-headless-vnc:stable" -t riccardoroccaro/cuda-blender-headless-vnc:stable .
+# docker build --build-arg APPLICATION=blender --build-arg REPO_TO_ADD="ppa:thomas-schiex/blender" --build-arg FROM_IMAGE="liqo/cuda-base-headless-vnc:latest" -t liqo/cuda-blender-headless-vnc:latest .
 #
 
 
 ### Build argument that specifies which base image to start from.
-ARG FROM_IMAGE="riccardoroccaro/base-headless-vnc:stable"
+ARG FROM_IMAGE="liqo/base-headless-vnc:latest"
 
 FROM ${FROM_IMAGE}
 LABEL maintainer="Riccardo Roccaro <r0cc4rd0@gmail.com>"

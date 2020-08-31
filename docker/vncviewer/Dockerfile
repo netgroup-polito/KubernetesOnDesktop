@@ -3,18 +3,18 @@
 #============================#
 # *** Build tigervnc docker ***
 #
-# docker build -t riccardoroccaro/vncviewer:stable .
+# docker build -t liqo/vncviewer:latest .
 #
 # *** Run vncviewer in a container ***
 #
-# docker run --name riccardoroccaro-vncviewer \
+# docker run --name vncviewer \
 #     -v ${working_dir}:/home/vnc/ssh_id_rsa \
 #     -v /tmp/.X11-unix/:/tmp/.X11-unix/ \
 #     --device /dev/snd \
 #     -v /dev/shm:/dev/shm \
 #     -v /var/run/dbus:/var/run/dbus \
 #     -e DISPLAY \
-#     riccardoroccaro/vncviewer:stable \
+#     liqo/vncviewer:latest \
 #     enc=<enc> `#enc [1|0]` \
 #     pod=<pod> `#pod [1|0]` \
 #     compression=<CompressLevel> `#comression [0-6]` \
@@ -54,7 +54,7 @@
 # `--device /dev/snd`
 # with:
 # `-v /dev/snd:/dev/snd`
-# and adding before the image name (riccardoroccaro/vncviewer:stable) line the following:
+# and adding before the image name (liqo/vncviewer:latest) line the following:
 # `--privileged`
 #
 

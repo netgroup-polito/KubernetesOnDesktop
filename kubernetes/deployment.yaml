@@ -35,7 +35,7 @@ spec:
 #          claimName: RAR_002_APP_NAME-pv-claim
       containers:
       - name: RAR_001_APP_NAME_PID-kubernetes
-        image: riccardoroccaro/RAR_002_APP_NAME-headless-vnc:stable
+        image: liqo/RAR_002_APP_NAME-headless-vnc:latest
         imagePullPolicy: IfNotPresent
         env:
         #Local pod pulse server
