@@ -31,7 +31,7 @@ while true; do
 
 	if [[ $reply == "yes" ]]; then
 		echo -n "Deleting k8s-on-desktop namespace..."
-		kubectl delete namespace k8s-on-desktop &>/dev/null
+		sudo -u $SUDO_USER KUBECONFIG=$KUBECONFIG kubectl delete namespace k8s-on-desktop &>/dev/null
 		echo "Done"
 		break;
 	elif [[ $reply == "no" ]]; then

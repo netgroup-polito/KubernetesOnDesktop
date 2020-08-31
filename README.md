@@ -176,7 +176,7 @@ Firefox (noVNC)
 To uninstall KubernetesOnDesktop simply run the following command:
 
 ```bash
-cloudify-uninstall
+sudo cloudify-uninstall
 ```
 
 **Note:** During the uninstall process it will be asked if you want to remove the `k8s-on-desktop` namespace too. This is because by removing it all the Persistent Volume Claims will be removed too resulting in a REMOTE CONFIGURATION AND DATA LOSS for each application!!! So, BE CAREFUL when choosing whether to remove it or not.
