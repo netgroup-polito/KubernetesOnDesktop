@@ -15,12 +15,12 @@ v2.0
 * [KubernetesOnDesktop release/v2.0 - Roccaro](https://docs.google.com/presentation/d/16z3NjHMjUr7YS_KgGWZ5komRSfAWSNqNonW72dKzagI/edit?usp=sharing)
 
 ## Introduction
-KubernetesOnDesktop is a university project with the aim of developing a cloud infrastructure to run user application in a remote cluster. Thanks to the Netgroup Polito cluster, we have developed a very high performing infrastructure to let run applications on k8s and connect to them via many protocols.
+KubernetesOnDesktop is a university project with the aim of developing a cloud infrastructure to run user application in a remote cluster. Thanks to the Netgroup Polito cluster, we have developed a very high performing infrastructure to let the applications run on k8s and connect to them via many protocols.
 
-To make modifications persistent, we decided to create a PersistentVolumeClaim for each different application so that all the users remote preferences and files are restored at every execution to improve the user experience.
-So far, the supported applications are [Firefox](https://www.mozilla.org/it/firefox), [Libreoffice](https://it.libreoffice.org) and [Blender](https://www.blender.org). All the remote and local k8s/docker resources created will be destroyed when the execution ends.
+In order to make modifications persistent, we decided to create a PersistentVolumeClaim for each different application so that all the users remote preferences and files are restored at every execution to improve the user experience.
+So far, the supported applications are [Firefox](https://www.mozilla.org/it/firefox), [Libreoffice](https://it.libreoffice.org) and [Blender](https://www.blender.org). All the remote and local k8s/docker resources created will be destroyed once the execution ends.
 
-Interestingly, depending on the connection quality and on the `pod` availability, the required application will be executed in Cloud or in the local user computer (if it natively exists). This is a user-friendly feature to not alter the normal execution behavior in certain particular cases. Everything is tunable user-side like connection quality, program executed, compression, encryption etc.
+Interestingly, depending on the connection quality and on the `pod` availability, the required application will be executed in the Cloud or in the local user computer (if it natively exists). This is a user-friendly feature to not alter the normal execution behavior in certain particular cases. Everything is tunable user-side like connection quality, program executed, compression, encryption etc.
 
 ## Used technologies
 * TigerVNC
@@ -43,18 +43,18 @@ VNC viewer and `vncpasswd` are required only in native mode execution (see [run 
 While in native mode execution Kubectl is mandatory, Netcat and VNC viewer can be replaced by other application modifying the script. However, make sure that the ones you want to use are compatible with all the parameters (quality, compression), otherwise you may not achieve the same result.
 
 **Note:**
-Due to the usage of `vncpasswd` command to automatically encrypt the password from the command line, also the vncserver dependency should be installed while using native run mode. There are no current `vncpasswd` standalone installation.
+Due to the usage of `vncpasswd` command to encrypt automatically the password from the command line, also the vncserver dependency should be installed while using native run mode. There are no current `vncpasswd` standalone installation.
 
 ## Supported Applications
-This is the second version of the project, so we preferred to keep on going by focusing on the quality of our services instead of the quantity.
+This is the second version of the project, so we preferred to keep on going by focusing on the quality of our services rather than the quantity.
 
-The supported ones are:
+The supported applications are:
 * Firefox
 * Libreoffice
 * Blender (also available with NVIDIA CUDA graphic card support)
 
 ## How it works
-For the sake of simplicity, in this draw (representing the main scenario) it has been omitted the entire network infrastructure (routers, other servers on cluster, etc.) of the cluster, leaving only the element in question.  
+For the sake of simplicity, in this draw (representing the general scenario) it has been omitted the entire network infrastructure (routers, other servers on cluster, etc.) of the cluster, leaving only the element in question.  
 
 ![Infrastructure](doc_images/Infrastructure.png)
 
@@ -87,7 +87,7 @@ The server-side deployment consists in the following steps:
 
 2. network connectivity and speed will be checked in order to decide whether to run the application locally or in the cluster. To accomplish that, we have used a simple `kubectl describe pods` command, because it not only allows us to understand if network is up, but it also tells us your network/cluster condition. We could have used a `kubectl get version` command, but it is always very reactive and sometimes cached, while getting all `pod`s (or every other resource) requires a bit of computation, which is cool to be considered;
 
-3. a new token (to be used for the VNC server authentication ) and a new SSH key pair with no passphrase (to be used as authN for the new connection) will be generated. The SSH keys are extremely important, since they are used to map the remote `pod` PulseAudio local port to the user PulseAudio TCP server, launched later;
+3. a new token (to be used for the VNC server authentication ) and a new SSH key pair with no passphrase (to be used as authN for the new connection) will be generated. The SSH keys are extremely important, since they are used to map the remote `pod` PulseAudio local port to the user PulseAudio TCP server, which will be launched later;
 
 4. The cluster will be prepared by creating a namespace and applying some labels to control the client-side (if run mode is k8s `pod`) and server-side pods scheduling;
 
@@ -179,7 +179,7 @@ To uninstall KubernetesOnDesktop simply run the following command:
 cloudify-uninstall
 ```
 
-**Note:** During the uninstall process it will be asked if you want to remove the `k8s-on-desktop` namespace too. This is because by removing it all the Persistent Volume Claims will be removed too resulting in a REMOTE CONFIGURATION AND DATA LOST for each application!!! So, BE CAREFUL when chosing whether to remove it or not.
+**Note:** During the uninstall process it will be asked if you want to remove the `k8s-on-desktop` namespace too. This is because by removing it all the Persistent Volume Claims will be removed too resulting in a REMOTE CONFIGURATION AND DATA LOSS for each application!!! So, BE CAREFUL when choosing whether to remove it or not.
 
 ## Acknowledgments
 
