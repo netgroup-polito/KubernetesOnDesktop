@@ -42,7 +42,7 @@ VNC viewer and `vncpasswd` are required only in native mode execution (see [run 
 
 While in native mode execution Kubectl is mandatory, Netcat and VNC viewer can be replaced by other application modifying the script. However, make sure that the ones you want to use are compatible with all the parameters (quality, compression), otherwise you may not achieve the same result.
 
-**Note**
+**Note:**
 Due to the usage of `vncpasswd` command to automatically encrypt the password from the command line, also the vncserver dependency should be installed while using native run mode. There are no current `vncpasswd` standalone installation.
 
 ## Supported Applications
@@ -63,20 +63,22 @@ As you can see in the picture above, the architecture can be splitted in two sid
 * a client-side (the *user home* one in the picture) that is in charge to remotize the target application GUI through VNC and PulseAudio.
 
 The client-side has three different run modes and, depending on which run-mode will be used, the implementation of the architecture above may be a little bit different:
-1. Native run mode, in which as suggested by its name, there is a vncviewer application installed ad used natively in the user machine. So, the architecture implementation is actually the one represented in the picture above.
+1. "Native" run mode, in which as suggested by its name, there is a vncviewer application installed and used natively in the user machine. So, the architecture implementation is actually the one represented in the picture above.
 
-2. Docker container run mode, in which the client side required software (vncviewer, vncpasswd and PulseAudio server) is installed and runned inside a docker container. The architecture implementation is a little bit different because the flows occur between the (local) docker container and the (remote) k8s `pod` (see the picture below).
+![DockerArchitecture](doc_images/NativeArchitecture.png)
+
+2. "Docker container" run mode, in which the client side required software (vncviewer, vncpasswd and PulseAudio server) is installed and runned inside a docker container. The architecture implementation is a little bit different because the flows occur between the (local) docker container and the (remote) k8s `pod` (see the picture below).
 
 ![DockerArchitecture](doc_images/DockerArchitecture.png)
 
-3. Kubernetes `pod` run mode, in which, as the previous run mode, the client side required software is installed inside a docker image but executed inside a k8s `pod`. Again, this time the architecture implementation is a little bit different because both the client and the server must be two nodes of the same kubernetes cluster and the flows occur between two k8s `pod`s in that cluster (see the picture below).
+3. "Kubernetes `pod`" run mode, in which, as the previous run mode, the client side required software is installed inside a docker image but executed inside a k8s `pod`. Again, this time the architecture implementation is a little bit different because both the client and the server must be two nodes of the same kubernetes cluster and the flows occur between two k8s `pod`s in that cluster (see the picture below).
 
 ![PodArchitecture](doc_images/PodArchitecture.png)
 
 ## Application execution phases
 The application execution can be splitted in two parts:
-1. The [deployment of the server-side](deployment-of-the-server-side)
-2. The [deployment of the client-side](deployment-of-the-client-side)
+1. The [deployment of the server-side](#deployment-of-the-server-side)
+2. The [deployment of the client-side](#deployment-of-the-client-side)
 
 ### Deployment of the server-side
 The server-side deployment consists in the following steps:
@@ -91,23 +93,23 @@ The server-side deployment consists in the following steps:
 
 5. a k8s `secret` containing the the SSH public key will be genereted. This secret will be mounted inside the remote `pod`;
 
-6. the deploy is applied to the cluster and the process will wait for the target application `pod` state changes to `RUNNING`.
+6. the deploy is applied to the cluster and the process will wait for the target application `pod` state to change in `RUNNING`.
 
 Of course every phase has its own controls to be sure that the following step executes only if all the previous succeeded.
 
 ### Deployment of the client-side 
-Once the target application `pod`'s state it `RUNNING`, the deployment of the client-side will be done by executing the following steps:
+Once the target application `pod`'s state is `RUNNING`, the deployment of the client-side will be done by executing the following steps:
 
 1. Retrieving all the useful information like the IP to contact, the PORT opened for the services and the assigned `pod` name. This is not required if run mode is k8s `pod` because wont't be used the NodePort but the [DNS for service](https://kubernetes.io/docs/concepts/services-networking/dns-`pod`-service/);
 
 2. Depending on run mode:
-   * Native: will be loaded the PulseAudio module-native-protocol-tcp, opened the reverse-port-forwarding SSH tunnel (to forward the audio), launched the vncviewer (or Firefox if noVNC is used));
+   * Native: will be loaded the PulseAudio module-native-protocol-tcp, opened the reverse-port-forwarding SSH tunnel (to forward the audio), launched the vncviewer (or Firefox if noVNC is used);
    * Docker container: will be created and executed the container that follows the same workflow of native run mode inside;
    * k8s `pod`: will be modified a temp copy of the vncviewer.yaml file according to the parameter required to run vncviewer inside the `pod`, applied the vncviewer.yaml `job` to the cluster and waited for the vncviewer `job` to be completed.
 
 In every cases, the connection phase starts with a mandatory remote port forwarding for the audio and an optional local port forwarding for the encrypted VNC/noVNC connection, depending whether the encryption has been previously enable or not.
 
-Finally, once the client terminates, the script handles the final phase, where all the (local or remote) created resources will be deleted, the ssh connections are closed and the PulseAudio TCP server is shut down.
+Finally, once the client terminates, the script handles the final phase where all the (local or remote) created resources will be deleted, the ssh connections are closed and the PulseAudio TCP server is shut down.
 
 ### SSH keys and One time Token
 As previously anticipated, each run generates a new SSH key pair in the directory `/tmp/Cloudify/` where also the used deployment has been copied. These information are one-shot, meaning that the next run will generate new ones starting from scratch. 
@@ -121,7 +123,7 @@ To install KubernetesOnDesktop on your machine you can just use the follwing ins
 sudo curl -L https://raw.githubusercontent.com/netgroup-polito/KubernetesOnDesktop/master/install.sh | sudo bash -s -- --remote
 ```
 
-**Note** Don't forget to install all the required dependencies (Kubectl, Docker, vncviewer and vncpasswd) to make the application works properly.
+**Note:** Don't forget to install all the required dependencies (Kubectl, Docker, vncviewer and vncpasswd) to make the application works properly.
 
 ## Usage
 Once all the dependencies are installed, since it is a cloud based application you don't have to install anything else.
@@ -160,7 +162,7 @@ Usage: ./cloudify [-h] [-e] [-t timeout] [-p protocol] [-q quality] [-c compress
 
 If everything was correct, a vncviewer window rendering the application will appear. Interestingly, you now not only can play the remote audio, but also controlling it. 
 
-**Note** As you can see above, one of the supported `app_name` is `cuda-blender`. This way you can run `blender` using the NVIDIA CUDA graphic card if the `pod` where it is running in has been scheduled on a node having a NVIDIA CUDA graphic card with its drivers installed (see [NVIDIA Quickstart](https://github.com/NVIDIA/nvidia-docker#quickstart)).
+**Note:** As you can see above, one of the supported `app_name` is `cuda-blender`. This way you can run `blender` using the NVIDIA CUDA graphic card if the `pod` where it is running in has been scheduled on a node having a NVIDIA CUDA graphic card with its drivers installed (see [NVIDIA Quickstart](https://github.com/NVIDIA/nvidia-docker#quickstart)).
 
 Firefox (VNC)
 
@@ -177,7 +179,7 @@ To uninstall KubernetesOnDesktop simply run the following command:
 cloudify-uninstall
 ```
 
-**Note** During the uninstall process will be asked if you want to remove the `k8s-on-desktop` namespace too. This is because by removing it all the Persistent Volume Claims will be removed too resulting in a REMOTE CONFIGURATION AND DATA LOST for each application!!! So, BE CAREFUL when chosing whether to remove it or not.
+**Note:** During the uninstall process it will be asked if you want to remove the `k8s-on-desktop` namespace too. This is because by removing it all the Persistent Volume Claims will be removed too resulting in a REMOTE CONFIGURATION AND DATA LOST for each application!!! So, BE CAREFUL when chosing whether to remove it or not.
 
 ## Acknowledgments
 
