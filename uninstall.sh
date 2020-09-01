@@ -1,5 +1,4 @@
 #!/bin/bash
-set -e
 
 if [[ $EUID -ne 0 ]]; then
    echo "This script must be run as root" 
@@ -8,25 +7,40 @@ fi
 
 echo "Uninstalling Cloudify :("
 
-echo "Deleting application folder"
+echo -n "Deleting application folder..."
 rm -rf /opt/Cloudify
+echo "Done"
 
-echo "Removing executable"
+echo -n "Removing executables..."
 rm -f /usr/bin/cloudify
+rm -f /usr/bin/cloudify-uninstall
+echo "Done"
 
-echo "Removing Cloudfox desktop entries and icon" 
-rm -f /home/$SUDO_USER/.local/share/applications/Cloudfox.desktop \
-	/home/$SUDO_USER/Desktop/Cloudfox.desktop \
-	/usr/share/icons/hicolor/64x64/apps/cloudfox.png
-
-echo "Removing Cloudlibre desktop entries and icon" 
-rm -f /home/$SUDO_USER/.local/share/applications/Cloudlibre.desktop \
-	/home/$SUDO_USER/Desktop/Cloudlibre.desktop \
-	/usr/share/icons/hicolor/64x64/apps/cloudlibre.png
-
-echo "Removing old deploy files"
+echo -n "Removing old deploy files..."
 rm -rf /tmp/Cloudify
+echo "Done"
 
+echo "Do you want to remove the 'kod' namespace too?"
+echo -n "WARNING: this will remove the 'Persistent Volume Claims' "
+echo -n "from k8s and all the remote saved files (if any) for each "
+echo "application WILL BE LOST!!!"
+echo -n "If you want to, "
+	  
+while true; do
+	read -p "please type 'yes' otherwise type 'no' ==> " -r reply
+
+	if [[ $reply == "yes" ]]; then
+		echo -n "Deleting kod namespace..."
+		sudo -u $SUDO_USER KUBECONFIG=$KUBECONFIG kubectl delete namespace kod &>/dev/null
+		echo "Done"
+		break;
+	elif [[ $reply == "no" ]]; then
+		echo "The kod namespaced will not be deleted"
+		break;
+	fi
+done
+
+echo "KubernetesOnDesktop succesfully uninstalled."
 echo ""
 echo "WARNING:"
 echo "If you added your user in the 'docker' group after the cloudify installation"

@@ -6,12 +6,19 @@
 #
 # *** Build the docker ***
 #
-# docker build -t riccardoroccaro/base-headless-vnc:v1.0 .
+# Default build
+# docker build -t liqo/base-headless-vnc:latest .
+#
+# Build with NVIDIA support
+# docker build -t liqo/cuda-base-headless-vnc:latest --build-arg FROM_IMAGE="nvidia/cuda:10.2-runtime-ubuntu18.04" .
 #
 
-FROM ubuntu:18.04
-LABEL maintainer="Riccardo Roccaro <riccardoroccaro@gmail.com>"
-ENV REFRESHED_AT 2020-07-30
+### Build argument that specifies which image to start from.
+ARG FROM_IMAGE="ubuntu:18.04"
+
+FROM ${FROM_IMAGE}
+LABEL maintainer="Riccardo Roccaro <r0cc4rd0@gmail.com>"
+ENV REFRESHED_AT 2020-08-20
 
 LABEL io.k8s.description="Headless VNC Container with Xfce window manager and many applications" \
       io.k8s.display-name="Headless VNC Container based on Ubuntu"
@@ -25,6 +32,7 @@ ENV DISPLAY=:0 \
     NO_VNC_PORT=5800 \
     SSH_PORT=22
 
+### Exposing required ports
 EXPOSE $VNC_PORT $NO_VNC_PORT $SSH_PORT
 
 ### Envrionment config
@@ -67,6 +75,7 @@ RUN mkdir -p $NO_VNC_HOME/utils/websockify && \
     ## create index.html to forward automatically to `vnc_lite.html`
     ln -s $NO_VNC_HOME/vnc_lite.html $NO_VNC_HOME/index.html
 
+### Setting locale
 RUN locale-gen en_US.UTF-8
 ENV LANG='en_US.UTF-8' LANGUAGE='en_US:en' LC_ALL='en_US.UTF-8'
 

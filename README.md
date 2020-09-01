@@ -1,143 +1,181 @@
 # Kubernetes On Desktop
+## Developed by: 
+* **Simone Magnani** (release/v1.0) 
+* **Antonio Riccardo Roccaro** (release/v2.0)
 
-Developed by: **Simone Magnani** - **Antonio Riccardo Roccaro**
+## Tutor: 
+* **Fulvio Risso**
+* **Alex Palesandro**
 
-Tutor: **Fulvio Risso** - **Alex Palesandro**
+## Version: 
+v2.0
 
-Version: 1.0
+## Presentation slides: 
+* [KubernetesOnDesktop release/v1.0 - Magnani](https://docs.google.com/presentation/d/15Dj8vwPaAyB_QmC_4886_E1K4pc7DzzlEPeiWJJMcCI/edit#slide=id.g742e3e7cd_1_16)
+* [KubernetesOnDesktop release/v2.0 - Roccaro](https://docs.google.com/presentation/d/16z3NjHMjUr7YS_KgGWZ5komRSfAWSNqNonW72dKzagI/edit?usp=sharing)
 
-Presentation slides: 
-* [KubernetesOnDesktop - Magnani](https://docs.google.com/presentation/d/15Dj8vwPaAyB_QmC_4886_E1K4pc7DzzlEPeiWJJMcCI/edit#slide=id.g742e3e7cd_1_16)
-* [KubernetesOnDesktop - Roccaro](https://docs.google.com/presentation/d/1wgvFvCxXwwiVH2EqXjM8Idhhes_Zjr_Ciq4St1TMbKE/edit?usp=sharing)
+## Introduction
+KubernetesOnDesktop is a university project with the aim of developing a cloud infrastructure to run user application in a remote cluster. Thanks to the Netgroup Polito cluster, we have developed a very high performing infrastructure to let the applications run on k8s and connect to them via many protocols.
 
-## Description
+In order to make modifications persistent, we decided to create a PersistentVolumeClaim for each different application so that all the users remote preferences and files are restored at every execution to improve the user experience.
+So far, the supported applications are [Firefox](https://www.mozilla.org/it/firefox), [Libreoffice](https://it.libreoffice.org) and [Blender](https://www.blender.org). All the remote and local k8s/docker resources created will be destroyed once the execution ends.
 
-Cloud Computing course project with the aim of developing a cloud infrastructure to run user application in a remote cluster.
+Interestingly, depending on the connection quality and on the `pod` availability, the required application will be executed in the Cloud or in the local user computer (if it natively exists). This is a user-friendly feature to not alter the normal execution behavior in certain particular cases. Everything is tunable user-side like connection quality, program executed, compression, encryption etc.
 
-Thanks to the Netgroup Polito cluster, we have developed a very high performing infrastructure to let correctly configured users deploy applications and connect to them via many protocols.
-
-To make modifications persistent, we decided to create a PersistentVolumeClaim for each different kind of application, thanks to all the users preferences are restored at every execution to improve the experience. 
-
-The actual program supported are Firefox and Libreoffice. The execution unit will be destroyed together with all the deployments once the user has finished to use it.
-
-Interestingly, depending on the connection quality and on the pod availability, the required application will be executed in Cloud or in the local user computer. This is a user-friendly feature not to alter the normal execution behavior in certain particular cases.
-
-Everything is tunable user-side like connection quality, program executed, compression, encryption etc.
-
-## Technologies used
-
+## Used technologies
 * TigerVNC
 * NoVNC
 * SSH server
 * Openbox (light window manager)
 * Some utility tools (wget, net-tools, locales, xdotool, python-numpy used for websockify/novnc, xorg)
-* Firefox/Libreoffice (once per docker image)
+* Firefox, Libreoffice, Blender (once per docker image)
 
 These not only allows our infrastructure to be reachable both via a VNC client and browser, but they also ensure that everything fits user needs and tastes.
 
 ## Dependencies
-
 * Kubectl
 * VNC viewer
 * vncpasswd (present in any vnc server package)
 * Netcat
 
-VNC viewer is required only in native mode execution. In the other cases (docker or k8s pod) it is already integrated inside the docker image.
+VNC viewer and `vncpasswd` are required only in native mode execution (see [run modes](#how-it-works) below). In the other cases (docker container or k8s `pod`) it is already integrated inside the docker images.
 
-While Kubectl is mandatory, Netcat and VNC viewer can be replaced by other application modifying the script. However, make sure that the ones you want to use are compatible with all the parameters (quality, compression), otherwise you may not achieve the same result.
+While in native mode execution Kubectl is mandatory, Netcat and VNC viewer can be replaced by other application modifying the script. However, make sure that the ones you want to use are compatible with all the parameters (quality, compression), otherwise you may not achieve the same result.
 
-**Note**
-
-Due to the usage of `vncpasswd` command to automatically encrypt the password from the command line, also the vncserver dependency should be installed
-while using native run mode. There are no current `vncpasswd` standalone installation.
+**Note:**
+Due to the usage of `vncpasswd` command to encrypt automatically the password from the command line, also the vncserver dependency should be installed while using native run mode. There are no current `vncpasswd` standalone installation.
 
 ## Supported Applications
+This is the second version of the project, so we preferred to keep on going by focusing on the quality of our services rather than the quantity.
 
-This is the first version of the project, so we preferred to focus on the quality of our services instead than the quantity.
-
-The supported ones are:
-
+The supported applications are:
 * Firefox
 * Libreoffice
+* Blender (also available with NVIDIA CUDA graphic card support)
 
 ## How it works
+For the sake of simplicity, in this draw (representing the general scenario) it has been omitted the entire network infrastructure (routers, other servers on cluster, etc.) of the cluster, leaving only the element in question.  
 
-For the sake of simplicity, in this draw it has been omitted the entire network infrastructure (routers, other servers on cluster, etc.) of the cluster, leaving only the element in question.  
+![Infrastructure](doc_images/Infrastructure.png)
 
+As you can see in the picture above, the architecture can be splitted in two sides:
+* a server-side (the *cluster* one in the picture) that is in charge of executing the target application in a (remote) cluster;
+* a client-side (the *user home* one in the picture) that is in charge to remotize the target application GUI through VNC and PulseAudio.
 
-![Infrastructure](res/Infrastructure.png)
+The client-side has three different run modes and, depending on which run-mode will be used, the implementation of the architecture above may be a little bit different:
+1. "Native" run mode, in which as suggested by its name, there is a vncviewer application installed and used natively in the user machine. So, the architecture implementation is actually the one represented in the picture above.
 
-### Deployment Phases
+![DockerArchitecture](doc_images/NativeArchitecture.png)
 
-As first, network connectivity and speed is checked in order to decide whether to run the application locally or in the cluster. To accomplish that, we have used a simple `kubectl get pods` command, because it not only allows us to understand if network is up, but it also tells us your network/cluster condition. We could have used a `kubectl get version` command, but it is always very reactive and sometimes cached, while getting all pods (or every other resource) requires a bit of computation, which is cool to be considered.
+2. "Docker container" run mode, in which the client side required software (vncviewer, vncpasswd and PulseAudio server) is installed and runned inside a docker container. The architecture implementation is a little bit different because the flows occur between the (local) docker container and the (remote) k8s `pod` (see the picture below).
 
-The second step is to modify the deployment file according to the user preferences. In fact, the template file contains all the possible combination of port/services used, and the `cloudify` script modifies them at every execution to deploy the desired system. Once finished, the deploy is applied to the cluster and, if it succeeds, the script looks for all the useful information like the IP to contact, the PORT opened for the services and the assigned pod name. Furthermore, in the mean time it is automatically generated a new SSH key pair with no passphrase to be used as authN for the new connection. The SSH keys are extremely important, since they are used to map the remote pod PulseAudio local port to the user PulseAudio TCP server, launched later.
+![DockerArchitecture](doc_images/DockerArchitecture.png)
 
-Once gathered pod's information, the program waits for the pod to change it's state to RUNNING, meaning that it's ready to be contacted. Of course every phase has its own controls to be sure that the following step executes only if all the previous succeeded. In this phase the public RSA key is copied to the specific pod and it is started the local PulseAudio TCP server. The user is now ready to connect.
+3. "Kubernetes `pod`" run mode, in which, as the previous run mode, the client side required software is installed inside a docker image but executed inside a k8s `pod`. Again, this time the architecture implementation is a little bit different because both the client and the server must be two nodes of the same kubernetes cluster and the flows occur between two k8s `pod`s in that cluster (see the picture below).
 
-The connection can be done in three different execution modes:
-1 - Native mode (by running cloudify with -r 0 option), that use the standalone vncviewer installation inside the local machine;
-2 - Docker mode (by running cloudify with -r 1 option), that use a docker image containing the vncviewer installation and all the other required packages;
-3 - K8s pod mode (by running cloudify with -r 2 option), that use the same docker image but its scheduling is done by k8s on the local machine that must a node of the k8s cluster.
+![PodArchitecture](doc_images/PodArchitecture.png)
 
-In every cases, the connection phase starts with a mandatory remote port forwarding for the audio and an optional local port forwarding for the encrypted VNC/noVNC connection, depending whether the encryption has been previously enable or not. If these command succeed, the connection starts using the right client (vncviewer or a browser).
+## Application execution phases
+The application execution can be splitted in two parts:
+1. The [deployment of the server-side](#deployment-of-the-server-side)
+2. The [deployment of the client-side](#deployment-of-the-client-side)
 
-A huge difference between the two client is that if a vncviewer is used, the user has still the possibility to change at run time some parameter to tune the connection quality as he wants, while if it using noVNC this is not allowed.
+### Deployment of the server-side
+The server-side deployment consists in the following steps:
 
-Finally, once the client terminates, the script handles the final phase, where the deploy is remotely deleted, the ssh connections are closed and the PulseAudio TCP server is shut down.
+1. a temp copy of the deployment file will be modified according to the user preferences. In fact, the template file contains all the possible combination of port/services used, and the `cloudify` script modifies them at every execution to deploy the desired system;
+
+2. network connectivity and speed will be checked in order to decide whether to run the application locally or in the cluster. To accomplish that, we have used a simple `kubectl describe pods` command, because it not only allows us to understand if network is up, but it also tells us your network/cluster condition. We could have used a `kubectl get version` command, but it is always very reactive and sometimes cached, while getting all `pod`s (or every other resource) requires a bit of computation, which is cool to be considered;
+
+3. a new token (to be used for the VNC server authentication ) and a new SSH key pair with no passphrase (to be used as authN for the new connection) will be generated. The SSH keys are extremely important, since they are used to map the remote `pod` PulseAudio local port to the user PulseAudio TCP server, which will be launched later;
+
+4. The cluster will be prepared by creating a namespace and applying some labels to control the client-side (if run mode is k8s `pod`) and server-side pods scheduling;
+
+5. a k8s `secret` containing the the SSH public key will be genereted. This secret will be mounted inside the remote `pod`;
+
+6. the deploy is applied to the cluster and the process will wait for the target application `pod` state to change in `RUNNING`.
+
+Of course every phase has its own controls to be sure that the following step executes only if all the previous succeeded.
+
+### Deployment of the client-side 
+Once the target application `pod`'s state is `RUNNING`, the deployment of the client-side will be done by executing the following steps:
+
+1. Retrieving all the useful information like the IP to contact, the PORT opened for the services and the assigned `pod` name. This is not required if run mode is k8s `pod` because wont't be used the NodePort but the [DNS for service](https://kubernetes.io/docs/concepts/services-networking/dns-`pod`-service/);
+
+2. Depending on run mode:
+   * Native: will be loaded the PulseAudio module-native-protocol-tcp, opened the reverse-port-forwarding SSH tunnel (to forward the audio), launched the vncviewer (or Firefox if noVNC is used);
+   * Docker container: will be created and executed the container that follows the same workflow of native run mode inside;
+   * k8s `pod`: will be modified a temp copy of the vncviewer.yaml file according to the parameter required to run vncviewer inside the `pod`, applied the vncviewer.yaml `job` to the cluster and waited for the vncviewer `job` to be completed.
+
+In every cases, the connection phase starts with a mandatory remote port forwarding for the audio and an optional local port forwarding for the encrypted VNC/noVNC connection, depending whether the encryption has been previously enable or not.
+
+Finally, once the client terminates, the script handles the final phase where all the (local or remote) created resources will be deleted, the ssh connections are closed and the PulseAudio TCP server is shut down.
 
 ### SSH keys and One time Token
-
 As previously anticipated, each run generates a new SSH key pair in the directory `/tmp/Cloudify/` where also the used deployment has been copied. These information are one-shot, meaning that the next run will generate new ones starting from scratch. 
 
-Even though user chooses not to encrypt the connection, the vnc session, that in this case could be sniffed with a MITM attack, is still password-protected. The password is a One Time Token generated before applying the deploy remotely and will be used to connect to the pod both with the two protocols. In case of noVNC, a pop-up with your secret token will appear on your screen, allowing you to copy and paste it directly in your browser.
+Even though user chooses not to encrypt the connection, the VNC session, that in this case could be sniffed with a MITM attack, is still password-protected. The password is a One Time Token generated before applying the deploy remotely and will be used to connect to the `pod` both with the two protocols. In case of noVNC, a pop-up with your secret token will appear on your screen, allowing you to copy and paste it directly in your browser.
 
-
-## Usage
-
-Once all the dependencies are installed, since it is a cloud based application you don't have to install anything else.
-
-The user must use the `cloudify` script to launch application, or use the various desktop launchers created. It is strongly suggested that he has a local installation of that application, since the script will automatically launch it if there are some connection or cluster availability errors.
-
-To use it, type in a terminal:
+## Installation
+To install KubernetesOnDesktop on your machine you can just use the follwing installation command:
 
 ```bash
-user@hostname:~/WorkingDirectory$ ./cloudify firefox
+sudo curl -L https://raw.githubusercontent.com/netgroup-polito/KubernetesOnDesktop/master/install.sh | sudo bash -s -- --remote
+```
+
+**Note:** Don't forget to install all the required dependencies (Kubectl, Docker, vncviewer and vncpasswd) to make the application works properly.
+
+## Usage
+Once all the dependencies are installed, since it is a cloud based application you don't have to install anything else.
+
+The user must use the `cloudify` script to launch the desired application. To use it, type in a terminal:
+
+```bash
+user@hostname:~$ cloudify firefox
 ```
 
 Actually there are a lot of optional parameter as reported in the script usage:
 
-```bash
+```
 Run application in Cloud using Kubernetes as orchestrator.
-Usage: ./cloudify [-h] [-e] [-t timeout] [-p protocol] [-q quality] [-c compression] [-r runmode] app_name
+Usage: ./cloudify [-h] [-s] [-t timeout] [-p protocol] [-q quality] [-c compression] [-v] [-r runmode] app_name
 |-> -h: start the helper menu
-|-> -e: specify that the connection must be encrypted (0/1, default 0 disabled)
+|-> -s: specify that the connection must be secured by using encryption (0/1, default 0 disabled)
 |-> -t: connection/wait timeout in seconds (positive number, default 60)
 |-> -p: connection protocol to be used (vnc/novnc, default vnc)
 |-> -q: specify the quality of the connection (0-9, default 5)
 |-> -c: specify the compression of the connection (0-6, default 2)
-|-> -r: vncviewer run mode:
-|       0-> native app
-|       1-> docker container
-|       2-> k8s pod
-|       default-> 0 (native app).
+|-> -v: specify to use the persistent volume claim (default disabled)
+|-> -r: vncviewer run mode (native/docker/pod, default pod).
 |       Warning: this option can't be used if '-p novnc' is set
 |
+|-> app_name: application to run. Supported applications: firefox,libreoffice,blender,cuda-blender
+|
 |->Example: ./cloudify firefox
-|->Example: ./cloudify -q 7 -t 10 -e firefox
-|->Example: ./cloudify -q 7 -t 10 -e -r 1 firefox
+|->Example: ./cloudify -q 7 -t 10 -s firefox
+|->Example: ./cloudify -q 7 -t 10 -s -r docker firefox
 ```
 
 If everything was correct, a vncviewer window rendering the application will appear. Interestingly, you now not only can play the remote audio, but also controlling it. 
 
+**Note:** As you can see above, one of the supported `app_name` is `cuda-blender`. This way you can run `blender` using the NVIDIA CUDA graphic card if the `pod` where it is running in has been scheduled on a node having a NVIDIA CUDA graphic card with its drivers installed (see [NVIDIA Quickstart](https://github.com/NVIDIA/nvidia-docker#quickstart)).
+
 Firefox (VNC)
 
-![Firefox using VNC](res/Firefox.png)
+![Firefox using VNC](doc_images/Firefox.png)
 
 Firefox (noVNC)
 
-![Firefox using noVNC](res/Firefox2.png)
+![Firefox using noVNC](doc_images/Firefox2.png)
 
+## Uninstall
+To uninstall KubernetesOnDesktop simply run the following command:
+
+```bash
+sudo cloudify-uninstall
+```
+
+**Note:** During the uninstall process it will be asked if you want to remove the `kod` namespace too. This is because by removing it all the Persistent Volume Claims will be removed too resulting in a REMOTE CONFIGURATION AND DATA LOSS for each application!!! So, BE CAREFUL when choosing whether to remove it or not.
 
 ## Acknowledgments
 

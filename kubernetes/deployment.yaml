@@ -2,29 +2,40 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: XXXXXXXXXX-deployment
+  name: RAR_001_APP_NAME_PID-deployment
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: XXXXXXXXXX
+      app: RAR_001_APP_NAME_PID
   template:
     metadata:
       labels:
-        app: XXXXXXXXXX
+        app: RAR_001_APP_NAME_PID
     spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                - key: RAR_004_NS_LABEL
+                  operator: DoesNotExist
       volumes:
       #Shared memory volume, to avoid crashes
       - name: dshm
         emptyDir:
           medium: Memory
+      #Secret containing the ssh public key
+      - name: ssh-secret
+        secret:
+          secretName: RAR_003_SSH_SECRET
       #User home directory
-      - name: XXXXXXXXXX-persistent-storage
-        persistentVolumeClaim:
-          claimName: XXXXXXXXXX-pv-claim
+#      - name: RAR_002_APP_NAME-persistent-storage
+#        persistentVolumeClaim:
+#          claimName: RAR_002_APP_NAME-pv-claim
       containers:
-      - name: XXXXXXXXXX-kubernetes
-        image: riccardoroccaro/XXXXXXXXXX-headless-vnc:stable
+      - name: RAR_001_APP_NAME_PID-kubernetes
+        image: liqo/RAR_002_APP_NAME-headless-vnc:latest
         imagePullPolicy: IfNotPresent
         env:
         #Local pod pulse server
@@ -49,29 +60,39 @@ spec:
         volumeMounts:
           - name: dshm
             mountPath: /dev/shm
+          #Mounting the secret containing the ssh public key
+          - name: ssh-secret
+            mountPath: /home/vncuser/ssh_secret
+            readOnly: true
           #Firefox PVC claim
 #          - name: firefox-persistent-storage
 #            mountPath: /home/vncuser/.mozilla
           #Libreoffice PVC claim
 #          - name: libreoffice-persistent-storage
 #            mountPath: /home/vncuser/Documents
+          #Blender PVC claim
+#          - name: blender-persistent-storage
+#            mountPath: /home/vncuser/Documents
+          #CUDA Blender PVC claim
+#          - name: cuda-blender-persistent-storage
+#            mountPath: /home/vncuser/Documents
         #Set max memory to avoid consumes and ensure minimum resources
         resources:
           limits:
-            memory: "4000Mi"
+            memory: "512Mi"
       terminationGracePeriodSeconds: 0
 ---
 #Service config
-#Substitute XXXXXXXXXX with the desired application name
+#Substitute RAR_001_APP_NAME_PID with the desired application name
 apiVersion: v1
 kind: Service
 metadata:
-  name: XXXXXXXXXX-service
+  name: RAR_001_APP_NAME_PID-service
   labels:
-    app: XXXXXXXXXX
+    app: RAR_001_APP_NAME_PID
 spec:
   selector:
-    app: XXXXXXXXXX
+    app: RAR_001_APP_NAME_PID
   ports:
   - name: novnc-svc-port
     protocol: TCP
@@ -85,4 +106,4 @@ spec:
     protocol: TCP
     port: 22
     targetPort: 22
-  type: NodePort
+  type: ClusterIP

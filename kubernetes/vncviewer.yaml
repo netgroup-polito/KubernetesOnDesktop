@@ -1,14 +1,14 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: riccardoroccaro-vncviewer
+  name: RAR_000_APP_NAME_PID-job
   labels:
-    app: riccardoroccaro-vncviewer
+    app: RAR_000_APP_NAME_PID
 spec:
   template:
     metadata:
       labels:
-        app: riccardoroccaro-vncviewer
+        app: RAR_000_APP_NAME_PID
     spec:
       nodeName: RAR_001_K8S_NODE_NAME # schedule pod to specific node. Replace value with appropriate nodeName
       containers:
@@ -48,8 +48,8 @@ spec:
           #Replace args with appropriate values
           resources:
             requests:
-              memory: "2048Mi"
-              cpu: "500m"
+              memory: "512Mi"
+              cpu: "250m"
             limits:
               memory: "3072Mi"
               cpu: "756m" #=0.75cpu
