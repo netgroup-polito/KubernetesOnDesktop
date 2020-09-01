@@ -20,7 +20,7 @@ echo -n "Removing old deploy files..."
 rm -rf /tmp/Cloudify
 echo "Done"
 
-echo "Do you want to remove the 'k8s-on-desktop' namespace too?"
+echo "Do you want to remove the 'kod' namespace too?"
 echo -n "WARNING: this will remove the 'Persistent Volume Claims' "
 echo -n "from k8s and all the remote saved files (if any) for each "
 echo "application WILL BE LOST!!!"
@@ -30,12 +30,12 @@ while true; do
 	read -p "please type 'yes' otherwise type 'no' ==> " -r reply
 
 	if [[ $reply == "yes" ]]; then
-		echo -n "Deleting k8s-on-desktop namespace..."
-		sudo -u $SUDO_USER KUBECONFIG=$KUBECONFIG kubectl delete namespace k8s-on-desktop &>/dev/null
+		echo -n "Deleting kod namespace..."
+		sudo -u $SUDO_USER KUBECONFIG=$KUBECONFIG kubectl delete namespace kod &>/dev/null
 		echo "Done"
 		break;
 	elif [[ $reply == "no" ]]; then
-		echo "The k8s-on-desktop namespaced will not be deleted"
+		echo "The kod namespaced will not be deleted"
 		break;
 	fi
 done

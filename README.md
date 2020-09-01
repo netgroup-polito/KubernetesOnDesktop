@@ -136,28 +136,24 @@ user@hostname:~$ cloudify firefox
 
 Actually there are a lot of optional parameter as reported in the script usage:
 
-```bash
+```
 Run application in Cloud using Kubernetes as orchestrator.
-Usage: ./cloudify [-h] [-e] [-t timeout] [-p protocol] [-q quality] [-c compression] [-r runmode] app_name
+Usage: ./cloudify [-h] [-s] [-t timeout] [-p protocol] [-q quality] [-c compression] [-v] [-r runmode] app_name
 |-> -h: start the helper menu
-|-> -e: specify that the connection must be encrypted (0/1, default 0 disabled)
+|-> -s: specify that the connection must be secured by using encryption (0/1, default 0 disabled)
 |-> -t: connection/wait timeout in seconds (positive number, default 60)
 |-> -p: connection protocol to be used (vnc/novnc, default vnc)
 |-> -q: specify the quality of the connection (0-9, default 5)
 |-> -c: specify the compression of the connection (0-6, default 2)
-|-> -v: specify whether to use the pvc or not (0-no/1-yes, default 0)
-|-> -r: vncviewer run mode:
-|       0-> native app
-|       1-> docker container
-|       2-> k8s `pod`
-|       default-> 0 (native app).
+|-> -v: specify to use the persistent volume claim (default disabled)
+|-> -r: vncviewer run mode (native/docker/pod, default pod).
 |       Warning: this option can't be used if '-p novnc' is set
 |
 |-> app_name: application to run. Supported applications: firefox,libreoffice,blender,cuda-blender
 |
 |->Example: ./cloudify firefox
-|->Example: ./cloudify -q 7 -t 10 -e firefox
-|->Example: ./cloudify -q 7 -t 10 -e -r 1 firefox
+|->Example: ./cloudify -q 7 -t 10 -s firefox
+|->Example: ./cloudify -q 7 -t 10 -s -r docker firefox
 ```
 
 If everything was correct, a vncviewer window rendering the application will appear. Interestingly, you now not only can play the remote audio, but also controlling it. 
@@ -179,7 +175,7 @@ To uninstall KubernetesOnDesktop simply run the following command:
 sudo cloudify-uninstall
 ```
 
-**Note:** During the uninstall process it will be asked if you want to remove the `k8s-on-desktop` namespace too. This is because by removing it all the Persistent Volume Claims will be removed too resulting in a REMOTE CONFIGURATION AND DATA LOSS for each application!!! So, BE CAREFUL when choosing whether to remove it or not.
+**Note:** During the uninstall process it will be asked if you want to remove the `kod` namespace too. This is because by removing it all the Persistent Volume Claims will be removed too resulting in a REMOTE CONFIGURATION AND DATA LOSS for each application!!! So, BE CAREFUL when choosing whether to remove it or not.
 
 ## Acknowledgments
 

@@ -29,16 +29,21 @@ alias cuda-blender=blender
 #List of supported protocols
 supported_protocols=("vnc" "novnc")
 #Variable containing the k8s namespace to be used
-k8s_namespace="k8s-on-desktop"
+k8s_namespace="kod"
 #Variable containing the ssh port
 ssh_port=22
-#Variable to select whether to use pvc or not
-use_pvc=0
+#Variables to select whether to use pvc or not
+default_use_pvc="disabled"
+if [[ $default_use_pvc == "disabled" ]]; then
+	use_pvc=0
+else
+	use_pvc=1
+fi
 #The vncviewer pod file
 tigervncPodFile="$folder/kubernetes/vncviewer.yaml"
 #vncviewer run mode (0-> native app, 1-> docker container, 2-> k8s pod)
-supported_run_modes=("0 (native app)" "1 (docker container)" "2 (k8s pod)")
-default_run_mode=0
+supported_run_modes=("native" "docker" "pod")
+default_run_mode=2
 run_mode=$default_run_mode
 #TigerVNC viewer docker's name and version
 tigervnc_docker="liqo/vncviewer:latest"
@@ -61,6 +66,12 @@ function adjust_appname_pid_secret_label {
 	sed -i "s/RAR_002_APP_NAME/${application_name}/" ${targetDeploy}
 	sed -i "s/RAR_003_SSH_SECRET/${ssh_secret_name}/" ${targetDeploy}
 	sed -i "s#RAR_004_NS_LABEL#${viewer_ns_label}#" ${targetDeploy}
+}
+
+#Function that replaces the ClusterIP type service with a NodePort one inside
+#the deployment.yaml file. This is required if run_mode=[0|1].
+function enable_nodeport {
+	sed -i "s/ClusterIP/NodePort/" ${targetDeploy}
 }
 
 #Set the new generated token in deployment
@@ -487,6 +498,11 @@ function start_deploy {
 		adjust_volumes
 	fi
 
+	#Enable NodePort if run_mode=[0|1]
+	if [[ "$run_mode" =~ ^[0-1]$ ]]; then
+		enable_nodeport
+	fi
+
 	#Adjust deployment.yaml file
 	adjust_encription
 	adjust_appname_pid_secret_label
@@ -517,8 +533,8 @@ function start_deploy {
 			#Register Ctr+C interrupt
 			trap 'clear_and_exit -1' INT TERM KILL EXIT QUIT HUP
 
-			#Preparing the cluster by creating the k8s-on-desktop namespace and 
-			#appling the label k8s-on-desktop/viewer-<pid>=true to the current node 
+			#Preparing the cluster by creating the kod namespace and 
+			#appling the label kod/viewer-<pid>=true to the current node 
 			#to avoid the vncserver pod to be scheduled on current node
 			prepare_cluster
 
@@ -632,7 +648,7 @@ function clear_and_exit {
 		echo "OK"
 	fi
 
-	#Remove 'k8s-on-desktop/viewer' node label
+	#Remove 'kod/viewer' node label
 	clean_cluster
 
 	echo "Process completed"
@@ -645,26 +661,22 @@ function clear_and_exit {
 #Print usage function
 function print_usage_and_exit {
 	echo "Run application in Cloud using Kubernetes as orchestrator."
-	echo "Usage: ./cloudify [-h] [-e] [-t timeout] [-p protocol] [-q quality] [-c compression] [-r runmode] app_name"
+	echo "Usage: ./cloudify [-h] [-s] [-t timeout] [-p protocol] [-q quality] [-c compression] [-v] [-r runmode] app_name"
 	echo "|-> -h: start the helper menu"
-	echo "|-> -e: specify that the connection must be encrypted (0/1, default 0 disabled)"
+	echo "|-> -s: specify that the connection must be secured by using encryption (0/1, default 0 disabled)"
 	echo "|-> -t: connection/wait timeout in seconds (positive number, default $timeout)"
 	echo "|-> -p: connection protocol to be used (vnc/novnc, default $protocol)"
 	echo "|-> -q: specify the quality of the connection (0-9, default $quality)"
 	echo "|-> -c: specify the compression of the connection (0-6, default $compression)"
-	echo "|-> -v: specify whether to use the pvc or not (0-no/1-yes, default $use_pvc)"
-	echo "|-> -r: vncviewer run mode:" 
-	echo "|       0-> native app"
-	echo "|       1-> docker container" 
-	echo "|       2-> k8s pod"
-	echo "|       default-> ${supported_run_modes[$default_run_mode]}." 
+	echo "|-> -v: specify to use the persistent volume claim (default $default_use_pvc)"
+	echo "|-> -r: vncviewer run mode ($(IFS='/'; echo "${supported_run_modes[*]}"), default ${supported_run_modes[$default_run_mode]})."
 	echo "|       Warning: this option can't be used if '-p novnc' is set"
 	echo "|"
 	echo "|-> app_name: application to run. Supported applications: $(IFS=','; echo "${supported_apps[*]}")"
 	echo "|"
 	echo "|->Example: ./cloudify firefox"
-	echo "|->Example: ./cloudify -q 7 -t 10 -e firefox"
-	echo "|->Example: ./cloudify -q 7 -t 10 -e -r 1 firefox"
+	echo "|->Example: ./cloudify -q 7 -t 10 -s firefox"
+	echo "|->Example: ./cloudify -q 7 -t 10 -s -r docker firefox"
 	exit $1
 }
 
@@ -694,12 +706,12 @@ function main() {
 	echo -n "Generating VNC AppName and PID..."
 	vnc_srv_app_pid="$application_name-$app_pid"
 	vnc_cli_app_pid="$tigervnc_container_name-$app_pid"
-	viewer_ns_label="k8s-on-desktop/vncviewer-$app_pid"
+	viewer_ns_label="kod/vncviewer-$app_pid"
 	echo "OK"
 
-	while getopts "hec:q:t:p:v:r:" opt; do
+	while getopts "hsc:q:t:p:vr:" opt; do
 		case $opt in
-			e)
+			s)
 				enc=1
 				echo "Parameter ENCRYPTION...OK activated"
 				;;
@@ -735,17 +747,24 @@ function main() {
 				echo "Parameter PROTOCOL...OK $OPTARG"
 				;;
 			v) 
-				if [[ ! "$OPTARG" =~ ^[0-1]$ ]]; then
-					print_usage_and_exit 1
-				fi
-				use_pvc=$OPTARG
-				echo "Parameter USE PVC...OK ${use_pvc}"
+				use_pvc=1
+				echo "Parameter USE PVC...OK"
 				;;
-			r)
-				if [[ ! "$OPTARG" =~ ^[0-2]$ ]]; then
-					print_usage_and_exit 1
-				fi
-				run_mode=$OPTARG
+			r)	
+				case $OPTARG in
+					native)
+							run_mode=0
+							;;
+					docker)
+							run_mode=1
+							;;
+					pod)
+							run_mode=2
+							;;
+					*)		
+							print_usage_and_exit 1
+							;;
+				esac
 				echo "Parameter RUN MODE...OK => Run as ${supported_run_modes[$run_mode]}"
 				;;
 			\?)

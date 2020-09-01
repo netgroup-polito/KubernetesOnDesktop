@@ -32,7 +32,7 @@ function install_from_remote_repository {
    echo "Welcome to KubernetesOnDesktop installation!"
 
    #Creating temp dir
-   inst_tmp_dir=$(mktemp -d -t k8s-on-desktop-$(date +%Y-%m-%d-%H-%M-%S)-XXXXXXXXXX)
+   inst_tmp_dir=$(mktemp -d -t kod-$(date +%Y-%m-%d-%H-%M-%S)-XXXXXXXXXX)
 
    #Downloading the repository into temp dir
    cd $inst_tmp_dir
